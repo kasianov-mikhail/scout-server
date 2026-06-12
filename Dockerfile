@@ -15,8 +15,8 @@ RUN swift build -c release --product App --static-swift-stdlib
 
 WORKDIR /staging
 
-RUN cp "$(swift build -c release --show-bin-path)/App" ./
-RUN find -L "$(swift build -c release --show-bin-path)" -regex '.*\.resources$' -exec cp -Ra {} ./ \; || true
+RUN cp "$(swift build --package-path /build -c release --show-bin-path)/App" ./
+RUN find -L "$(swift build --package-path /build -c release --show-bin-path)" -regex '.*\.resources$' -exec cp -Ra {} ./ \; || true
 
 # ================================
 # Run image
