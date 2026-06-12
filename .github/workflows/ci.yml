@@ -14,13 +14,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The Swift version is part of the key: build artifacts produced by a
+      # different compiler poison incremental builds with bogus module
+      # visibility errors.
+      - name: Swift version
+        id: swift
+        run: echo "version=$(swift --version | head -1 | tr -d ' ')" >> "$GITHUB_OUTPUT"
+
       - name: Cache SwiftPM
         uses: actions/cache@v4
         with:
           path: .build
-          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          key: spm-${{ steps.swift.outputs.version }}-${{ hashFiles('Package.resolved') }}
           restore-keys: |
-            spm-${{ runner.os }}-
+            spm-${{ steps.swift.outputs.version }}-
 
       - name: Build
         run: swift build --build-tests
