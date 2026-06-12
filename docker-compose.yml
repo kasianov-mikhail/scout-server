@@ -1,0 +1,33 @@
+services:
+  app:
+    image: ghcr.io/kasianov-mikhail/scout-server:latest
+    build:
+      context: .
+    environment:
+      DATABASE_HOST: db
+      DATABASE_USERNAME: scout
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-scout}
+      DATABASE_NAME: scout
+      SCOUT_API_KEYS: ${SCOUT_API_KEYS:-}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: scout
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-scout}
+      POSTGRES_DB: scout
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scout"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db_data:
