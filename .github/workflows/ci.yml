@@ -9,7 +9,7 @@ jobs:
   test:
     name: Build & Test
     runs-on: ubuntu-latest
-    container: swift:6.1-noble
+    container: swift:6.3-noble
     steps:
       - name: Checkout
         uses: actions/checkout@v4
