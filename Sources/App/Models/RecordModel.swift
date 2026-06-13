@@ -162,6 +162,7 @@ struct CreateRecord: AsyncMigration {
             .field("value_double", .double)
             .field("payload", .json, .required)
             .field("created_at", .datetime)
+            .field("ingest_source", .string)
             .unique(on: "record_name")
             .create()
     }
