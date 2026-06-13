@@ -1,5 +1,7 @@
 # API
 
+This document is a prose walkthrough; the authoritative, machine-readable contract is the OpenAPI document [`openapi.yaml`](Sources/App/openapi.yaml), also served at `GET /openapi.yaml`. The server's types are generated from it, so the spec — not this file — is the source of truth.
+
 All endpoints sit under `/api/v1` and require an API key, passed either as an `X-API-Key` header or a bearer token. Keys are configured with the `SCOUT_API_KEYS` environment variable (comma-separated). Without keys the API is open only in the `development` environment.
 
 ## Table of Contents
