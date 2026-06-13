@@ -88,3 +88,80 @@ jobs:
 
       - name: Test
         run: swift test --skip-build
+
+  # The suites above always migrate a fresh database, where every schema looks
+  # correct. Production migrates a populated one in place on each deploy, so a
+  # migration that fails on existing rows (e.g. a required column with no
+  # default) or drops data slips past them. This job replays a real upgrade:
+  # apply the base branch's migrations, seed a row, then apply the PR's
+  # migrations on top and confirm the data is still there.
+  migrations-upgrade:
+    name: Migrations on a populated DB
+    runs-on: ubuntu-latest
+    container: swift:6.3-noble
+    if: github.event_name == 'pull_request'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: scout
+          POSTGRES_PASSWORD: scout
+          POSTGRES_DB: scout
+        options: >-
+          --health-cmd "pg_isready -U scout -d scout"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://scout:scout@postgres:5432/scout?sslmode=disable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Need the base branch's history to migrate from it.
+          fetch-depth: 0
+
+      - name: Install psql
+        run: apt-get update && apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Swift version
+        id: swift
+        run: echo "version=$(swift --version | head -1 | tr -d ' ')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ steps.swift.outputs.version }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ steps.swift.outputs.version }}-
+
+      # `configure` runs `autoMigrate()` outside `.testing`, so any command
+      # applies the migrations and exits; a migration that errors aborts boot
+      # and fails the step. stdin is closed so a stray prompt can never hang CI.
+      - name: Apply base-branch migrations
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+          git checkout --quiet --force FETCH_HEAD
+          swift run App migrate < /dev/null
+
+      - name: Seed a record
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "INSERT INTO records (id, record_type, record_name, payload) \
+             VALUES (gen_random_uuid(), 'Event', 'ci-seed', '{}');"
+
+      - name: Apply PR migrations on the populated database
+        run: |
+          set -euo pipefail
+          git checkout --quiet --force "$GITHUB_SHA"
+          swift run App migrate < /dev/null
+
+      - name: Confirm seeded data survived
+        run: |
+          set -euo pipefail
+          count=$(psql "$DATABASE_URL" -tA -v ON_ERROR_STOP=1 -c 'SELECT count(*) FROM records;')
+          echo "records after upgrade: $count"
+          test "$count" -ge 1
