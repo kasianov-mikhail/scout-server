@@ -90,6 +90,7 @@ final class RecordModel: Model, @unchecked Sendable {
 extension RecordModel {
     convenience init(dto: RecordDTO) {
         self.init()
+        id = UUID.v7()
         recordType = dto.recordType
         recordName = dto.recordName
         apply(fields: dto.fields)
