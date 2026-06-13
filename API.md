@@ -49,11 +49,12 @@ The counterpart of `CKQuery`. Filters and sorts run against the queryable fields
 
 The response carries `records` and an opaque `cursor` when more pages exist; pass `{"cursor": "..."}` to continue.
 
-Queries for `DateIntMatrix`, `DateDoubleMatrix`, and `PeriodMatrix` are answered by aggregation over raw records, shaped exactly like the matrices a CloudKit client would have written:
+Queries for `DateIntMatrix` and `DateDoubleMatrix` are answered by aggregation over raw records, shaped exactly like the matrices a CloudKit client would have written:
 
 - `DateIntMatrix` — weekly hour-bucket counts of lifecycle records (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`), of events grouped by event name, and hour-bucket sums of `IntMetric` values grouped by metric name and category.
 - `DateDoubleMatrix` — hour-bucket sums of `DoubleMetric` values.
-- `PeriodMatrix` (`name == "ActiveUser"`) — monthly DAU/WAU/MAU matrices derived from distinct installs with `Session` activity.
+
+Active users (DAU/WAU/MAU) are aggregated natively too, but served as a flat series from [`GET /api/v1/metrics/active-users`](#get-apiv1metricsactive-users) rather than the CloudKit `PeriodMatrix`.
 
 `IntMetric` and `DoubleMetric` are raw record types Scout uploads to servers in place of the metric matrices it maintains on CloudKit (`name`, `category`, `date`, `value` + the usual id metadata).
 
