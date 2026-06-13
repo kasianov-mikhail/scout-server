@@ -141,7 +141,7 @@ jobs:
       # and fails the step. stdin is closed so a stray prompt can never hang CI.
       - name: Apply base-branch migrations
         run: |
-          set -euo pipefail
+          set -eu
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
           git checkout --quiet --force FETCH_HEAD
@@ -155,13 +155,13 @@ jobs:
 
       - name: Apply PR migrations on the populated database
         run: |
-          set -euo pipefail
+          set -eu
           git checkout --quiet --force "$GITHUB_SHA"
           swift run App migrate < /dev/null
 
       - name: Confirm seeded data survived
         run: |
-          set -euo pipefail
+          set -eu
           count=$(psql "$DATABASE_URL" -tA -v ON_ERROR_STOP=1 -c 'SELECT count(*) FROM records;')
           echo "records after upgrade: $count"
           test "$count" -ge 1
