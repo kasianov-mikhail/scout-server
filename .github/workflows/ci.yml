@@ -5,9 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# Cancel superseded pull request runs, but let pushes to main finish: a
+# cancelled job skips the cache-save post step, so aborting main runs would
+# leave the SwiftPM cache stale and every later build cold.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
