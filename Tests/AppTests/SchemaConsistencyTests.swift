@@ -15,11 +15,12 @@ import XCTVapor
 ///
 /// Fluent never links a model's `@Field`s to the `.field(...)` calls in its
 /// migration: adding a property without a matching migration compiles, passes
-/// any test that doesn't touch the new column, and only fails at runtime on
-/// Postgres once a row is written. This test boots the app (running every
-/// migration against in-memory SQLite, exactly as `withApp` does), then asserts
-/// the columns a model declares match the columns the migrations actually
-/// created — turning a forgotten migration into a red CI run instead.
+/// any test that doesn't touch the new column, and only fails at runtime once a
+/// row is written. This test boots the app (running every migration, exactly as
+/// `withApp` does), then asserts the columns a model declares match the columns
+/// the migrations actually created — turning a forgotten migration into a red
+/// CI run instead. It introspects whichever database backs the run, so it holds
+/// on both the fast SQLite suite and the Postgres CI job.
 final class SchemaConsistencyTests: XCTestCase {
 
     /// Every model whose columns a migration is expected to cover. Add new
@@ -30,13 +31,11 @@ final class SchemaConsistencyTests: XCTestCase {
 
     func testModelColumnsMatchMigratedSchema() async throws {
         try await withApp { app in
-            let sql = try XCTUnwrap(app.db(.sqlite) as? any SQLDatabase)
+            let sql = try XCTUnwrap(app.db as? any SQLDatabase)
 
             for model in Self.models {
                 let expected = Set(model.keys.map(\.description))
-
-                let rows = try await sql.raw("PRAGMA table_info(\(unsafeRaw: model.schema))").all()
-                let actual = Set(try rows.map { try $0.decode(column: "name", as: String.self) })
+                let actual = try await Self.columns(of: model.schema, in: sql)
 
                 XCTAssertEqual(
                     expected,
@@ -48,6 +47,21 @@ final class SchemaConsistencyTests: XCTestCase {
                     """
                 )
             }
+        }
+    }
+
+    /// The names of the columns that physically exist in `table`, read through
+    /// each backend's own catalog: `PRAGMA` on SQLite, `information_schema` on
+    /// Postgres.
+    private static func columns(of table: String, in sql: any SQLDatabase) async throws -> Set<String> {
+        if sql.dialect.name == "sqlite" {
+            let rows = try await sql.raw("PRAGMA table_info(\(unsafeRaw: table))").all()
+            return Set(try rows.map { try $0.decode(column: "name", as: String.self) })
+        } else {
+            let rows = try await sql.raw(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = \(bind: table)"
+            ).all()
+            return Set(try rows.map { try $0.decode(column: "column_name", as: String.self) })
         }
     }
 }

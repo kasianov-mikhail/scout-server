@@ -11,10 +11,12 @@ import FluentSQLiteDriver
 import Vapor
 
 public func configure(_ app: Application) async throws {
-    if app.environment == .testing {
-        app.databases.use(.sqlite(.memory), as: .sqlite)
-    } else if let url = Environment.get("DATABASE_URL") {
+    if let url = Environment.get("DATABASE_URL") {
+        // An explicit URL wins everywhere, including under `.testing`, so CI can
+        // run the suite against a real Postgres rather than in-memory SQLite.
         try app.databases.use(.postgres(url: url), as: .psql)
+    } else if app.environment == .testing {
+        app.databases.use(.sqlite(.memory), as: .sqlite)
     } else {
         app.databases.use(
             .postgres(

@@ -41,3 +41,50 @@ jobs:
 
       - name: Test
         run: swift test --skip-build
+
+  # The suite above runs on in-memory SQLite for speed; this job reruns it
+  # against the real engine production uses, catching Postgres-only failures
+  # (strict types, JSON/JSONB, GROUP BY and ordering, migrations that only error
+  # on a strict server) that SQLite silently tolerates.
+  test-postgres:
+    name: Build & Test (Postgres)
+    runs-on: ubuntu-latest
+    container: swift:6.3-noble
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: scout
+          POSTGRES_PASSWORD: scout
+          POSTGRES_DB: scout
+        options: >-
+          --health-cmd "pg_isready -U scout -d scout"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Setting DATABASE_URL makes the suite pick Postgres over SQLite. The host
+      # is the service container's label on the job's Docker network; the engine
+      # serves no TLS, so disable it explicitly.
+      DATABASE_URL: postgres://scout:scout@postgres:5432/scout?sslmode=disable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Swift version
+        id: swift
+        run: echo "version=$(swift --version | head -1 | tr -d ' ')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ steps.swift.outputs.version }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ steps.swift.outputs.version }}-
+
+      - name: Build
+        run: swift build --build-tests
+
+      - name: Test
+        run: swift test --skip-build
