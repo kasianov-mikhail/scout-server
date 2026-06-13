@@ -134,6 +134,33 @@ final class RecordQueryTests: XCTestCase {
         }
     }
 
+    func testCursorIsStableWhenSortKeysTie() async throws {
+        try await withApp { app in
+            // Every record shares one timestamp, so the sorted field is fully
+            // tied and only the id tiebreak in `RecordQueryService` gives a
+            // total order. Without it, offset pages drawn by separate queries
+            // could reorder the ties and skip or repeat rows.
+            let sameInstant = utcDate(2026, 6, 10, 9)
+            let events = (0..<10).map { _ in makeEvent(name: "tick", date: sameInstant) }
+            try await write(events, to: app)
+
+            var collected: [RecordDTO] = []
+            var request = QueryRequest(recordType: "Event", sort: [QuerySort(field: "date")], limit: 3)
+
+            for _ in 0..<10 {
+                let response = try await query(request, on: app)
+                collected += response.records
+                guard let cursor = response.cursor else {
+                    break
+                }
+                request = QueryRequest(cursor: cursor)
+            }
+
+            XCTAssertEqual(collected.count, 10)
+            XCTAssertEqual(Set(collected.map(\.recordName)).count, 10)
+        }
+    }
+
     func testRejectsUnknownFilterField() async throws {
         try await withApp { app in
             try await app.test(
