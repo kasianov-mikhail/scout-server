@@ -52,6 +52,9 @@ final class RecordModel: Model, @unchecked Sendable {
     @OptionalField(key: "session_id")
     var sessionID: String?
 
+    @OptionalField(key: "app_version")
+    var appVersion: String?
+
     @OptionalField(key: "date")
     var date: Date?
 
@@ -107,6 +110,7 @@ extension RecordModel {
         installID = fields["install_id"]?.stringValue
         launchID = fields["launch_id"]?.stringValue
         sessionID = fields["session_id"]?.stringValue
+        appVersion = fields["app_version"]?.stringValue
         date = fields["date"]?.dateValue
         startDate = fields["start_date"]?.dateValue
         endDate = fields["end_date"]?.dateValue
