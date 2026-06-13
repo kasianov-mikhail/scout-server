@@ -5,9 +5,13 @@ on:
     branches: [main]
     tags: ["v*"]
 
+# This workflow only runs on main pushes and release tags, both of which
+# publish images. Serialize same-ref runs instead of cancelling them so a
+# newer commit never aborts an in-flight publish mid-manifest, which would
+# leave ghcr.io tags inconsistent or a commit with no published image.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
