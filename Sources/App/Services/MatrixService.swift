@@ -11,20 +11,20 @@ import Vapor
 
 /// Synthesizes CloudKit-style matrix records from raw data.
 ///
-/// CloudKit cannot aggregate, so the Scout client maintains `DateIntMatrix`,
-/// `DateDoubleMatrix`, and `PeriodMatrix` records by hand. This server
-/// aggregates natively: clients only upload raw records, and queries for the
-/// matrix record types are answered by GROUP BY over those rows, shaped
-/// exactly like the records the client would have written.
+/// CloudKit cannot aggregate, so the Scout client maintains `DateIntMatrix`
+/// and `DateDoubleMatrix` records by hand. This server aggregates natively:
+/// clients only upload raw records, and queries for those matrix record types
+/// are answered by GROUP BY over the rows, shaped exactly like the records the
+/// client would have written. (Active users are aggregated natively too, but
+/// served as a flat series — see `ActiveUserService` / `MetricsController`.)
 ///
 enum MatrixService {
     static let matrixTypes: Set<String> = [
-        intMatrixType, doubleMatrixType, periodMatrixType,
+        intMatrixType, doubleMatrixType,
     ]
 
     static let intMatrixType = "DateIntMatrix"
     static let doubleMatrixType = "DateDoubleMatrix"
-    static let periodMatrixType = "PeriodMatrix"
 
     /// Lifecycle record types whose weekly `DateIntMatrix` is named after
     /// the record type itself, mirroring `LifecycleMatrix.names` in Scout.
@@ -50,8 +50,6 @@ enum MatrixService {
                 try await intMatrices(constraints, on: database)
             case doubleMatrixType:
                 try await doubleMatrices(constraints, on: database)
-            case periodMatrixType:
-                try await ActiveUserService.matrices(constraints, on: database)
             default:
                 throw Abort(.badRequest, reason: "Unknown matrix type '\(recordType)'")
             }

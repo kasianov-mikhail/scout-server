@@ -9,23 +9,16 @@ import Fluent
 import SQLKit
 import Vapor
 
-/// Computes DAU/WAU/MAU from raw `Session` records.
+/// Computes a DAU/WAU/MAU time series from raw `Session` records.
 ///
 /// The Scout client marks activity forward: an install active on day A
 /// counts as weekly-active for every day in `[A, A + 1 week)` and
 /// monthly-active for `[A, A + 1 month)`, summing 0/1 flags per install
 /// across all clients. The server mirrors that exact algorithm over the
-/// distinct (install, day) pairs derived from raw Session records.
-///
-/// Two shapes are served from the same computation:
-///   - `matrices` — the CloudKit-compatible monthly `PeriodMatrix` records
-///     (named "ActiveUser") the client reconstructs into a series.
-///   - `series` — a flat, aggregation-native DAU/WAU/MAU series that HTTP
-///     backends can serve directly, no matrix bookkeeping required.
+/// distinct (install, day) pairs derived from raw Session records and serves
+/// the result as a flat series from `GET /api/v1/metrics/active-users`.
 ///
 enum ActiveUserService {
-    static let matrixName = "ActiveUser"
-
     /// The record type whose rows signal user activity. Every app
     /// foreground creates a Session, making it the activity heartbeat.
     ///
@@ -42,51 +35,6 @@ enum ActiveUserService {
             case .weekly: .weekOfYear
             case .monthly: .month
             }
-        }
-    }
-
-    // MARK: - PeriodMatrix (CloudKit-compatible)
-
-    static func matrices(_ constraints: MatrixConstraints, on database: any Database) async throws -> [RecordDTO] {
-        if let name = constraints.name, name != matrixName {
-            return []
-        }
-
-        let active = try await activeInstalls(constraints, on: database)
-
-        // Fold day counts into monthly matrices: cell_<period>_<day-of-month>.
-        var matrices: [Date: [String: FieldValue]] = [:]
-
-        for (period, days) in active {
-            for (day, installs) in days {
-                let month = day.startOfMonth
-
-                guard constraints.dateRange.contains(month) else {
-                    continue
-                }
-
-                let index = Calendar.utc.dateComponents([.day], from: month, to: day).day ?? 0
-                let cell = "cell_\(period.rawValue)_\(String(format: "%02d", index + 1))"
-
-                matrices[month, default: [:]][cell] = .int(Int64(installs.count))
-            }
-        }
-
-        return matrices.map { month, cells in
-            var fields = cells
-            fields["date"] = .date(month)
-            fields["name"] = .string(matrixName)
-            fields["version"] = .int(1)
-            return RecordDTO(
-                recordType: MatrixService.periodMatrixType,
-                recordName: MatrixService.recordName(
-                    type: MatrixService.periodMatrixType,
-                    name: matrixName,
-                    category: nil,
-                    date: month
-                ),
-                fields: fields
-            )
         }
     }
 

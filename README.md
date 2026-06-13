@@ -3,7 +3,7 @@
 [![CI](https://github.com/kasianov-mikhail/scout-server/actions/workflows/ci.yml/badge.svg)](https://github.com/kasianov-mikhail/scout-server/actions/workflows/ci.yml) [![Docker](https://github.com/kasianov-mikhail/scout-server/actions/workflows/docker.yml/badge.svg)](https://github.com/kasianov-mikhail/scout-server/actions/workflows/docker.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![Swift](https://img.shields.io/badge/Swift-6.0-orange)
 
 
-A Vapor backend for the [Scout](https://github.com/kasianov-mikhail/scout) package. Scout clients can sync analytics to CloudKit, to one or more Scout servers, or to any combination of both. Unlike CloudKit, this server aggregates data natively: clients upload only raw records, and the matrix record types Scout's UI reads (`DateIntMatrix`, `DateDoubleMatrix`, `PeriodMatrix`) are synthesized on the fly with SQL aggregation — no client-side matrix bookkeeping required.
+A Vapor backend for the [Scout](https://github.com/kasianov-mikhail/scout) package. Scout clients can sync analytics to CloudKit, to one or more Scout servers, or to any combination of both. Unlike CloudKit, this server aggregates data natively: clients upload only raw records, and the matrix record types Scout's UI reads (`DateIntMatrix`, `DateDoubleMatrix`) are synthesized on the fly with SQL aggregation — no client-side matrix bookkeeping required. Active users (DAU/WAU/MAU) are aggregated the same way and served as a flat series.
 
 ## Table of Contents
 - [Features](#features)
@@ -17,7 +17,7 @@ A Vapor backend for the [Scout](https://github.com/kasianov-mikhail/scout) packa
 
 | | | |
 |:-:|-|-|
-| 📊 | **Native Aggregation** | The matrix record types Scout's UI reads (`DateIntMatrix`, `DateDoubleMatrix`, `PeriodMatrix`) are synthesized on the fly with SQL — clients upload only raw records, no matrix bookkeeping. |
+| 📊 | **Native Aggregation** | The matrix record types Scout's UI reads (`DateIntMatrix`, `DateDoubleMatrix`) and the DAU/WAU/MAU active-user series are synthesized on the fly with SQL — clients upload only raw records, no matrix bookkeeping. |
 | ☁️ | **CloudKit-Compatible** | The query API mirrors `CKQuery` and `savePolicy: .allKeys`, so sync stays idempotent and the [Scout](https://github.com/kasianov-mikhail/scout) dashboard reads it unchanged. |
 | 🔌 | **Multiple Backends** | Runs alongside CloudKit — clients sync to one or more servers, CloudKit, or any combination of them at once. |
 | 🔑 | **API Keys** | Endpoints are guarded by API keys, passed via an `X-API-Key` header or a bearer token. |
