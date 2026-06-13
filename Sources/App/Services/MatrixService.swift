@@ -244,6 +244,10 @@ struct MatrixConstraints {
     var name: String?
     var category: String?
 
+    init(dateRange: Range<Date>) {
+        self.dateRange = dateRange
+    }
+
     init(filters: [QueryFilter]) throws {
         var lower = Date.distantPast
         var upper = Date.distantFuture

@@ -9,14 +9,19 @@ import Fluent
 import SQLKit
 import Vapor
 
-/// Computes DAU/WAU/MAU and shapes the result as the client's monthly
-/// `PeriodMatrix` records named "ActiveUser".
+/// Computes DAU/WAU/MAU from raw `Session` records.
 ///
 /// The Scout client marks activity forward: an install active on day A
 /// counts as weekly-active for every day in `[A, A + 1 week)` and
 /// monthly-active for `[A, A + 1 month)`, summing 0/1 flags per install
 /// across all clients. The server mirrors that exact algorithm over the
 /// distinct (install, day) pairs derived from raw Session records.
+///
+/// Two shapes are served from the same computation:
+///   - `matrices` — the CloudKit-compatible monthly `PeriodMatrix` records
+///     (named "ActiveUser") the client reconstructs into a series.
+///   - `series` — a flat, aggregation-native DAU/WAU/MAU series that HTTP
+///     backends can serve directly, no matrix bookkeeping required.
 ///
 enum ActiveUserService {
     static let matrixName = "ActiveUser"
@@ -40,32 +45,14 @@ enum ActiveUserService {
         }
     }
 
+    // MARK: - PeriodMatrix (CloudKit-compatible)
+
     static func matrices(_ constraints: MatrixConstraints, on database: any Database) async throws -> [RecordDTO] {
         if let name = constraints.name, name != matrixName {
             return []
         }
 
-        let pairs = try await activity(constraints, on: database)
-
-        // For each period, the set of installs counted active on each day.
-        var active: [Period: [Date: Set<String>]] = [:]
-        let calendar = Calendar.utc
-
-        for pair in pairs {
-            let day = Date(timeIntervalSince1970: Double(pair.day))
-
-            for period in Period.allCases {
-                let limit = calendar.date(byAdding: period.component, value: 1, to: day)!
-                var marked = day
-
-                while marked < limit {
-                    if constraints.dateRange.upperBound > marked {
-                        active[period, default: [:]][marked, default: []].insert(pair.install)
-                    }
-                    marked = calendar.date(byAdding: .day, value: 1, to: marked)!
-                }
-            }
-        }
+        let active = try await activeInstalls(constraints, on: database)
 
         // Fold day counts into monthly matrices: cell_<period>_<day-of-month>.
         var matrices: [Date: [String: FieldValue]] = [:]
@@ -78,7 +65,7 @@ enum ActiveUserService {
                     continue
                 }
 
-                let index = calendar.dateComponents([.day], from: month, to: day).day ?? 0
+                let index = Calendar.utc.dateComponents([.day], from: month, to: day).day ?? 0
                 let cell = "cell_\(period.rawValue)_\(String(format: "%02d", index + 1))"
 
                 matrices[month, default: [:]][cell] = .int(Int64(installs.count))
@@ -101,6 +88,69 @@ enum ActiveUserService {
                 fields: fields
             )
         }
+    }
+
+    // MARK: - Native series
+
+    /// A flat DAU/WAU/MAU series — the aggregation-native shape HTTP backends
+    /// serve in place of the CloudKit `PeriodMatrix`. One point per UTC day in
+    /// the half-open `[from, to)` range, each an as-of trailing distinct-install
+    /// count (daily, 7-day, calendar-month). Zero-activity days are included so
+    /// the result is a dense, directly chartable series.
+    ///
+    static func series(from: Date, to: Date, on database: any Database) async throws -> [ActiveUserPoint] {
+        let constraints = MatrixConstraints(dateRange: from..<to)
+        let active = try await activeInstalls(constraints, on: database)
+
+        var points: [ActiveUserPoint] = []
+        var day = from.startOfDay
+
+        while day < to {
+            points.append(
+                ActiveUserPoint(
+                    date: Int64((day.timeIntervalSince1970 * 1000).rounded()),
+                    dau: active[.daily]?[day]?.count ?? 0,
+                    wau: active[.weekly]?[day]?.count ?? 0,
+                    mau: active[.monthly]?[day]?.count ?? 0
+                )
+            )
+            day = Calendar.utc.date(byAdding: .day, value: 1, to: day)!
+        }
+
+        return points
+    }
+
+    // MARK: - Forward-Marked Activity
+
+    /// For each period, the set of installs counted active on each day. An
+    /// install active on day A is marked forward across `[A, A + 1 period)`,
+    /// so a day's set is exactly the distinct installs active in the trailing
+    /// window ending that day. Days at or after the range's upper bound are
+    /// skipped, matching the half-open query semantics.
+    ///
+    private static func activeInstalls(_ constraints: MatrixConstraints, on database: any Database) async throws -> [Period: [Date: Set<String>]] {
+        let pairs = try await activity(constraints, on: database)
+
+        var active: [Period: [Date: Set<String>]] = [:]
+        let calendar = Calendar.utc
+
+        for pair in pairs {
+            let day = Date(timeIntervalSince1970: Double(pair.day))
+
+            for period in Period.allCases {
+                let limit = calendar.date(byAdding: period.component, value: 1, to: day)!
+                var marked = day
+
+                while marked < limit {
+                    if constraints.dateRange.upperBound > marked {
+                        active[period, default: [:]][marked, default: []].insert(pair.install)
+                    }
+                    marked = calendar.date(byAdding: .day, value: 1, to: marked)!
+                }
+            }
+        }
+
+        return active
     }
 
     // MARK: - Activity Pairs

@@ -6,6 +6,7 @@ All endpoints sit under `/api/v1` and require an API key, passed either as an `X
 - [`POST /api/v1/records`](#post-apiv1records)
 - [`POST /api/v1/records/query`](#post-apiv1recordsquery)
 - [`GET /api/v1/records/:recordName`](#get-apiv1recordsrecordname)
+- [`GET /api/v1/metrics/active-users`](#get-apiv1metricsactive-users)
 - [`GET /healthz`](#get-healthz)
 
 ## `POST /api/v1/records`
@@ -59,6 +60,20 @@ Queries for `DateIntMatrix`, `DateDoubleMatrix`, and `PeriodMatrix` are answered
 ## `GET /api/v1/records/:recordName`
 
 Fetches a single record (CloudKit's `lookup`), with an optional `?fields=a,b,c` projection. Returns 404 when missing.
+
+## `GET /api/v1/metrics/active-users`
+
+The native, pre-aggregated DAU/WAU/MAU series. CloudKit clients reconstruct active-user counts from the hand-maintained `ActiveUser` `PeriodMatrix`; against a Scout server there is no need for that bookkeeping — the server returns the finished series.
+
+`from` and `to` bound a half-open `[from, to)` range as milliseconds since the Unix epoch; `to` defaults to now and `from` to 90 days earlier. The response carries one point per UTC day (zero-activity days included), each an as-of trailing distinct-install count over the day (`dau`), 7 days (`wau`), and calendar month (`mau`).
+
+```json
+{
+  "series": [
+    {"date": 1780272000000, "dau": 1, "wau": 1, "mau": 1}
+  ]
+}
+```
 
 ## `GET /healthz`
 

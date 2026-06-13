@@ -15,4 +15,5 @@ func routes(_ app: Application) throws {
     let api = app.grouped("api", "v1").grouped(APIKeyMiddleware())
 
     try api.register(collection: RecordController())
+    try api.register(collection: MetricsController())
 }

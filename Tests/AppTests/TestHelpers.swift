@@ -147,3 +147,18 @@ func query(_ request: QueryRequest, on app: Application) async throws -> QueryRe
     )
     return response!
 }
+
+func activeUsers(from: Date, to: Date, on app: Application) async throws -> [ActiveUserPoint] {
+    let fromMs = Int64((from.timeIntervalSince1970 * 1000).rounded())
+    let toMs = Int64((to.timeIntervalSince1970 * 1000).rounded())
+    var response: ActiveUsersResponse?
+    try await app.test(
+        .GET, "api/v1/metrics/active-users?from=\(fromMs)&to=\(toMs)",
+        headers: .authorized,
+        afterResponse: { res async throws in
+            XCTAssertEqual(res.status, .ok, res.body.string)
+            response = try res.content.decode(ActiveUsersResponse.self)
+        }
+    )
+    return response!.series
+}
