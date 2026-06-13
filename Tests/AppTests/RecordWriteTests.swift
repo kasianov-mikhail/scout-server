@@ -76,6 +76,31 @@ final class RecordWriteTests: XCTestCase {
         }
     }
 
+    func testRecordNameIsGlobalIdentityAcrossTypes() async throws {
+        try await withApp { app in
+            // The unique constraint is on `record_name` alone, mirroring a
+            // CloudKit record name: reusing a name under a different type
+            // updates the existing record in place — it keeps its original
+            // type and takes the new fields — rather than creating a second
+            // row. This pins that intent so the global scope stays a deliberate
+            // choice, not something a later change can quietly undo.
+            let name = "shared-id"
+            try await write([makeRecord(type: "Alpha", name: name, fields: ["level": .string("info")])], to: app)
+            try await write([makeRecord(type: "Beta", name: name, fields: ["level": .string("warn")])], to: app)
+
+            try await app.test(.GET, "api/v1/records/\(name)", headers: .authorized) { res async throws in
+                XCTAssertEqual(res.status, .ok)
+                let fetched = try res.content.decode(RecordDTO.self)
+                XCTAssertEqual(fetched.recordType, "Alpha")
+                XCTAssertEqual(fetched.fields["level"], .string("warn"))
+            }
+
+            // The second write did not spawn a row under the new type.
+            let beta = try await query(QueryRequest(recordType: "Beta"), on: app)
+            XCTAssertTrue(beta.records.isEmpty)
+        }
+    }
+
     func testUpsertReplacesFields() async throws {
         try await withApp { app in
             let start = utcDate(2026, 6, 10, 9)
