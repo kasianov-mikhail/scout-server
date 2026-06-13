@@ -1,10 +1,6 @@
 # Scout Server
 
-[![CI](https://github.com/kasianov-mikhail/scout-server/actions/workflows/ci.yml/badge.svg)](https://github.com/kasianov-mikhail/scout-server/actions/workflows/ci.yml)
-[![Docker](https://github.com/kasianov-mikhail/scout-server/actions/workflows/docker.yml/badge.svg)](https://github.com/kasianov-mikhail/scout-server/actions/workflows/docker.yml)
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Swift](https://img.shields.io/badge/Swift-6.0-orange)
+[![CI](https://github.com/kasianov-mikhail/scout-server/actions/workflows/ci.yml/badge.svg)](https://github.com/kasianov-mikhail/scout-server/actions/workflows/ci.yml) [![Docker](https://github.com/kasianov-mikhail/scout-server/actions/workflows/docker.yml/badge.svg)](https://github.com/kasianov-mikhail/scout-server/actions/workflows/docker.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![Swift](https://img.shields.io/badge/Swift-6.0-orange)
 
 
 A Vapor backend for the [Scout](https://github.com/kasianov-mikhail/scout) package. Scout clients can sync analytics to CloudKit, to one or more Scout servers, or to any combination of both. Unlike CloudKit, this server aggregates data natively: clients upload only raw records, and the matrix record types Scout's UI reads (`DateIntMatrix`, `DateDoubleMatrix`, `PeriodMatrix`) are synthesized on the fly with SQL aggregation — no client-side matrix bookkeeping required.
