@@ -9,14 +9,13 @@ import Fluent
 import SQLKit
 import Vapor
 
-/// Synthesizes CloudKit-style matrix records from raw data.
+/// Synthesizes matrix records from raw data.
 ///
-/// CloudKit cannot aggregate, so the Scout client maintains `DateIntMatrix`
-/// and `DateDoubleMatrix` records by hand. This server aggregates natively:
-/// clients only upload raw records, and queries for those matrix record types
-/// are answered by GROUP BY over the rows, shaped exactly like the records the
-/// client would have written. (Active users are aggregated natively too, but
-/// served as a flat series — see `ActiveUserService` / `MetricsController`.)
+/// Clients upload only raw records; queries for the `DateIntMatrix` and
+/// `DateDoubleMatrix` record types are answered by GROUP BY aggregation over
+/// the rows, assembled into the matrix shape Scout's UI reads. (Active users
+/// are aggregated natively too, but served as a flat series — see
+/// `ActiveUserService` / `MetricsController`.)
 ///
 enum MatrixService {
     static let matrixTypes: Set<String> = [
@@ -27,12 +26,12 @@ enum MatrixService {
     static let doubleMatrixType = "DateDoubleMatrix"
 
     /// Lifecycle record types whose weekly `DateIntMatrix` is named after
-    /// the record type itself, mirroring `LifecycleMatrix.names` in Scout.
+    /// the record type itself.
     ///
     static let lifecycleTypes = ["Crash", "Device", "Install", "Launch", "Session", "Version"]
 
-    /// Raw metric record types uploaded by HTTP backends in place of the
-    /// metric matrices the client maintains on CloudKit.
+    /// Raw metric record types clients upload; the server aggregates them
+    /// into the matrix records above.
     ///
     static let intMetricType = "IntMetric"
     static let doubleMetricType = "DoubleMetric"
@@ -65,6 +64,20 @@ enum MatrixService {
     // MARK: - DateIntMatrix / DateDoubleMatrix
 
     private static func intMatrices(_ constraints: MatrixConstraints, on database: any Database) async throws -> [RecordDTO] {
+        let buckets = try await intBuckets(constraints, on: database)
+        return assemble(buckets, recordType: intMatrixType, constraints: constraints) { .int($0.totalInt ?? 0) }
+    }
+
+    private static func doubleMatrices(_ constraints: MatrixConstraints, on database: any Database) async throws -> [RecordDTO] {
+        let buckets = try await doubleBuckets(constraints, on: database)
+        return assemble(buckets, recordType: doubleMatrixType, constraints: constraints) { .double($0.totalDouble ?? 0) }
+    }
+
+    /// Hourly integer buckets behind `DateIntMatrix`: lifecycle and event
+    /// record counts plus `IntMetric` value sums, honoring the name/category
+    /// constraints. Shared with the flat series in `MetricSeriesService`.
+    ///
+    static func intBuckets(_ constraints: MatrixConstraints, on database: any Database) async throws -> [MatrixBucket] {
         var buckets: [MatrixBucket] = []
 
         if constraints.category == nil {
@@ -76,13 +89,14 @@ enum MatrixService {
 
         buckets += try await sumBuckets(recordType: intMetricType, constraints: constraints, on: database)
 
-        return assemble(buckets, recordType: intMatrixType, constraints: constraints) { .int($0.totalInt ?? 0) }
+        return buckets
     }
 
-    private static func doubleMatrices(_ constraints: MatrixConstraints, on database: any Database) async throws -> [RecordDTO] {
-        let buckets = try await sumBuckets(recordType: doubleMetricType, constraints: constraints, on: database)
-
-        return assemble(buckets, recordType: doubleMatrixType, constraints: constraints) { .double($0.totalDouble ?? 0) }
+    /// Hourly double buckets behind `DateDoubleMatrix`: `DoubleMetric` value
+    /// sums. Shared with the flat series in `MetricSeriesService`.
+    ///
+    static func doubleBuckets(_ constraints: MatrixConstraints, on database: any Database) async throws -> [MatrixBucket] {
+        try await sumBuckets(recordType: doubleMetricType, constraints: constraints, on: database)
     }
 
     /// Per-hour record counts; `named` overrides the matrix name for
@@ -167,8 +181,8 @@ enum MatrixService {
             let cell = "cell_\(weekday)_\(String(format: "%02d", hour))"
 
             // An event sharing a lifecycle type's name lands in the same
-            // bucket; CloudKit would store two records that the client sums
-            // on read, so summing here preserves the observable result.
+            // bucket, so summing their counts here keeps both contributions
+            // in the observable result.
             matrices[key, default: [:]][cell] = adding(matrices[key]?[cell], value(bucket))
         }
 

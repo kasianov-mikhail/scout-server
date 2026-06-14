@@ -8,10 +8,9 @@
 import Fluent
 import Vapor
 
-/// Serves pre-aggregated metric series natively, the simpler counterpart of
-/// the CloudKit matrices Scout reconstructs by hand. Where CloudKit forces the
-/// client to maintain `PeriodMatrix` records, an HTTP backend just answers with
-/// the finished series.
+/// Serves pre-aggregated metric series natively: the server aggregates raw
+/// records and answers with finished series — the DAU/WAU/MAU active-user
+/// counts and a flat value-per-bucket series for any single name.
 ///
 struct MetricsController: RouteCollection {
     /// Span used when the caller omits `from`: the trailing 90 days.
@@ -20,6 +19,7 @@ struct MetricsController: RouteCollection {
     func boot(routes: any RoutesBuilder) throws {
         let metrics = routes.grouped("metrics")
         metrics.get("active-users", use: activeUsers)
+        metrics.get("series", use: series)
     }
 
     /// `GET /metrics/active-users?from=<ms>&to=<ms>` — one DAU/WAU/MAU point per
@@ -37,6 +37,34 @@ struct MetricsController: RouteCollection {
 
         let series = try await ActiveUserService.series(from: from, to: to, on: req.db)
         return ActiveUsersResponse(series: series)
+    }
+
+    /// `GET /metrics/series?name=<name>&category=<cat>&bucket=hour|day|week&from=<ms>&to=<ms>`
+    /// — a flat, dense value-per-bucket series for one metric, event, or
+    /// lifecycle name, the time-axis counterpart of the matrix grid. `name` is
+    /// required, `category` and `bucket` (default `day`) optional; the range
+    /// defaults to the trailing 90 days, like `activeUsers`.
+    ///
+    func series(req: Request) async throws -> MetricSeriesResponse {
+        guard let name = req.query[String.self, at: "name"], !name.isEmpty else {
+            throw Abort(.badRequest, reason: "Query parameter 'name' is required")
+        }
+        let category = req.query[String.self, at: "category"].flatMap { $0.isEmpty ? nil : $0 }
+
+        let bucketName = req.query[String.self, at: "bucket"] ?? MetricSeriesService.Bucket.day.rawValue
+        guard let bucket = MetricSeriesService.Bucket(rawValue: bucketName) else {
+            throw Abort(.badRequest, reason: "Unknown bucket '\(bucketName)'; expected hour, day, or week")
+        }
+
+        let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
+        let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
+
+        guard from < to else {
+            throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
+        }
+
+        let series = try await MetricSeriesService.series(name: name, category: category, bucket: bucket, from: from, to: to, on: req.db)
+        return MetricSeriesResponse(series: series)
     }
 
     private static func date(ms: Int64) -> Date {

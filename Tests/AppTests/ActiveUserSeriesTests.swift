@@ -10,9 +10,9 @@ import XCTVapor
 @testable import App
 
 /// The native `/metrics/active-users` series is the flat DAU/WAU/MAU shape
-/// HTTP backends serve instead of the CloudKit `PeriodMatrix`. Each point is an
-/// as-of trailing distinct-install count for the day, week, and calendar month
-/// ending that UTC day, with zero-activity days included.
+/// the server serves directly. Each point is an as-of trailing distinct-install
+/// count for the day, week, and calendar month ending that UTC day, with
+/// zero-activity days included.
 ///
 final class ActiveUserSeriesTests: XCTestCase {
     func point(_ series: [ActiveUserPoint], _ date: Date) -> ActiveUserPoint? {

@@ -7,11 +7,12 @@ All endpoints sit under `/api/v1` and require an API key, passed either as an `X
 - [`POST /api/v1/records/query`](#post-apiv1recordsquery)
 - [`GET /api/v1/records/:recordName`](#get-apiv1recordsrecordname)
 - [`GET /api/v1/metrics/active-users`](#get-apiv1metricsactive-users)
+- [`GET /api/v1/metrics/series`](#get-apiv1metricsseries)
 - [`GET /healthz`](#get-healthz)
 
 ## `POST /api/v1/records`
 
-Upserts a batch of records (at most 1000 per request) keyed by `recordName`, mirroring CloudKit's `savePolicy: .allKeys` so sync retries stay idempotent. Matrix record types are rejected — they are derived, not stored.
+Upserts a batch of records (at most 1000 per request) keyed by `recordName`: re-sent records overwrite their fields, so sync retries stay idempotent. Matrix record types are rejected — they are derived, not stored.
 
 ```json
 {
@@ -33,7 +34,7 @@ Field values are typed, single-key objects: `string`, `int`, `double`, `date` (m
 
 ## `POST /api/v1/records/query`
 
-The counterpart of `CKQuery`. Filters and sorts run against the queryable fields (`name`, `category`, `level`, `uuid`, `device_id`, `install_id`, `launch_id`, `session_id`, `date`, `start_date`, `end_date`, `param_count`). Operators: `equals`, `notEquals`, `greaterThan`, `greaterThanOrEquals`, `lessThan`, `lessThanOrEquals`, `in`, `beginsWith`.
+Filters and sorts run against the queryable fields (`name`, `category`, `level`, `uuid`, `device_id`, `install_id`, `launch_id`, `session_id`, `date`, `start_date`, `end_date`, `param_count`). Operators: `equals`, `notEquals`, `greaterThan`, `greaterThanOrEquals`, `lessThan`, `lessThanOrEquals`, `in`, `beginsWith`.
 
 ```json
 {
@@ -49,22 +50,24 @@ The counterpart of `CKQuery`. Filters and sorts run against the queryable fields
 
 The response carries `records` and an opaque `cursor` when more pages exist; pass `{"cursor": "..."}` to continue.
 
-Queries for `DateIntMatrix` and `DateDoubleMatrix` are answered by aggregation over raw records, shaped exactly like the matrices a CloudKit client would have written:
+Queries for `DateIntMatrix` and `DateDoubleMatrix` are answered by aggregation over raw records:
 
 - `DateIntMatrix` — weekly hour-bucket counts of lifecycle records (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`), of events grouped by event name, and hour-bucket sums of `IntMetric` values grouped by metric name and category.
 - `DateDoubleMatrix` — hour-bucket sums of `DoubleMetric` values.
 
-Active users (DAU/WAU/MAU) are aggregated natively too, but served as a flat series from [`GET /api/v1/metrics/active-users`](#get-apiv1metricsactive-users) rather than the CloudKit `PeriodMatrix`.
+The same aggregation is also available for a single name as a flat time series — see [`GET /api/v1/metrics/series`](#get-apiv1metricsseries).
 
-`IntMetric` and `DoubleMetric` are raw record types Scout uploads to servers in place of the metric matrices it maintains on CloudKit (`name`, `category`, `date`, `value` + the usual id metadata).
+Active users (DAU/WAU/MAU) are aggregated natively too, but served as a flat series from [`GET /api/v1/metrics/active-users`](#get-apiv1metricsactive-users).
+
+`IntMetric` and `DoubleMetric` are the raw metric record types clients upload (`name`, `category`, `date`, `value` + the usual id metadata); the server aggregates them into the matrix records above.
 
 ## `GET /api/v1/records/:recordName`
 
-Fetches a single record (CloudKit's `lookup`), with an optional `?fields=a,b,c` projection. Returns 404 when missing.
+Fetches a single record by `recordName`, with an optional `?fields=a,b,c` projection. Returns 404 when missing.
 
 ## `GET /api/v1/metrics/active-users`
 
-The native, pre-aggregated DAU/WAU/MAU series. CloudKit clients reconstruct active-user counts from the hand-maintained `ActiveUser` `PeriodMatrix`; against a Scout server there is no need for that bookkeeping — the server returns the finished series.
+The native, pre-aggregated DAU/WAU/MAU series. The server derives active-user counts from raw `Session` records and returns the finished series directly.
 
 `from` and `to` bound a half-open `[from, to)` range as milliseconds since the Unix epoch; `to` defaults to now and `from` to 90 days earlier. The response carries one point per UTC day (zero-activity days included), each an as-of trailing distinct-install count over the day (`dau`), 7 days (`wau`), and calendar month (`mau`).
 
@@ -72,6 +75,27 @@ The native, pre-aggregated DAU/WAU/MAU series. CloudKit clients reconstruct acti
 {
   "series": [
     {"date": 1780272000000, "dau": 1, "wau": 1, "mau": 1}
+  ]
+}
+```
+
+## `GET /api/v1/metrics/series`
+
+A flat, pre-aggregated value-per-bucket series for a single name — the time-axis counterpart of the `DateIntMatrix` / `DateDoubleMatrix` grid. The same raw records feed both: record counts for lifecycle types (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`) and event names, value sums for `IntMetric` / `DoubleMetric` names.
+
+| Parameter | Meaning |
+| --- | --- |
+| `name` | Required. The lifecycle type, event name, or metric name to aggregate. |
+| `category` | Optional. Narrows metric names to one telemetry category. |
+| `bucket` | `hour`, `day`, or `week` (default `day`). `week` starts on Sunday. |
+| `from` / `to` | Half-open `[from, to)` range in milliseconds since the Unix epoch; `to` defaults to now and `from` to 90 days earlier. |
+
+The response carries one point per bucket over the range (empty buckets included, so the series is dense), each a typed `value` — `int` for counts and `IntMetric` sums, `double` for `DoubleMetric` sums. The range snaps down to the bucket containing `from`, so the first bucket is whole.
+
+```json
+{
+  "series": [
+    {"date": 1780272000000, "value": {"int": 42}}
   ]
 }
 ```

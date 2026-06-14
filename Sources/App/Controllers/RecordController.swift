@@ -19,9 +19,8 @@ struct RecordController: RouteCollection {
         records.get(":recordName", use: lookup)
     }
 
-    /// Upserts a batch of records by `recordName`, mirroring CloudKit's
-    /// `savePolicy: .allKeys` — re-sent records overwrite their fields, so
-    /// sync retries stay idempotent.
+    /// Upserts a batch of records by `recordName` — re-sent records overwrite
+    /// their fields, so sync retries stay idempotent.
     ///
     func write(req: Request) async throws -> WriteResponse {
         let body = try req.content.decode(WriteRequest.self)
