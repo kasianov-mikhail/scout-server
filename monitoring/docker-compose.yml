@@ -1,0 +1,36 @@
+# Uptime Kuma — self-hosted uptime monitoring for the scout-server deployment.
+#
+# This is a SEPARATE stack from the application (Sources/.. -> /opt/scout). It
+# runs in its own directory on the server (/opt/monitoring) so the monitor's
+# lifecycle is independent of app deploys and survives a scout stack restart.
+#
+# It joins the `scout_default` network (created by the scout stack) as an
+# external network so it can reach the app and database by their compose
+# service names — `app:8080` for /healthz and `db:5432` for the Postgres check,
+# neither of which is publicly reachable from outside the host.
+#
+# Deploy / update on the server:
+#   cd /opt/monitoring && docker compose pull && docker compose up -d
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    ports:
+      # Plain HTTP, protected by Kuma's own login. Front with a TLS reverse
+      # proxy before exposing anything sensitive.
+      - "3001:3001"
+    volumes:
+      - uptime-kuma-data:/app/data
+    networks:
+      - default
+      - scout
+
+networks:
+  # Provided by the scout application stack (project "scout" -> "scout_default").
+  scout:
+    external: true
+    name: scout_default
+
+volumes:
+  uptime-kuma-data:
