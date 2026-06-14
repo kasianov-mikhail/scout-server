@@ -9,8 +9,6 @@ services:
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-scout}
       DATABASE_NAME: scout
       SCOUT_API_KEYS: ${SCOUT_API_KEYS:-}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     ports:
       - "8080:8080"
     depends_on:
