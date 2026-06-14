@@ -48,7 +48,7 @@ final class RecordWriteTests: XCTestCase {
 
             try await app.test(.GET, "api/v1/records/\(event.recordName)", headers: .authorized) { res async throws in
                 XCTAssertEqual(res.status, .ok)
-                let fetched = try res.content.decode(RecordDTO.self)
+                let fetched = try res.content.decode(Record.self)
                 XCTAssertEqual(fetched, event)
             }
         }
@@ -62,7 +62,7 @@ final class RecordWriteTests: XCTestCase {
             try await app.test(
                 .GET, "api/v1/records/\(event.recordName)?fields=name,level", headers: .authorized
             ) { res async throws in
-                let fetched = try res.content.decode(RecordDTO.self)
+                let fetched = try res.content.decode(Record.self)
                 XCTAssertEqual(Set(fetched.fields.keys), ["name", "level"])
             }
         }
@@ -90,7 +90,7 @@ final class RecordWriteTests: XCTestCase {
 
             try await app.test(.GET, "api/v1/records/\(name)", headers: .authorized) { res async throws in
                 XCTAssertEqual(res.status, .ok)
-                let fetched = try res.content.decode(RecordDTO.self)
+                let fetched = try res.content.decode(Record.self)
                 XCTAssertEqual(fetched.recordType, "Alpha")
                 XCTAssertEqual(fetched.fields["level"], .string("warn"))
             }

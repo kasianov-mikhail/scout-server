@@ -17,7 +17,7 @@ extension UUID {
     /// the B-tree. That keeps the hot pages packed and avoids the page splits
     /// and index bloat random keys cause once a table grows large. The trade
     /// is that the creation time is now readable from the id; `records` keeps
-    /// `id` server-internal (the DTO never exposes it), so nothing leaks.
+    /// `id` server-internal (the wire `Record` never exposes it), so nothing leaks.
     ///
     /// `now` is injectable so tests can pin the timestamp; callers take the
     /// default.

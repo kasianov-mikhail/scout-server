@@ -117,7 +117,7 @@ final class RecordQueryTests: XCTestCase {
             }
             try await write(events, to: app)
 
-            var collected: [RecordDTO] = []
+            var collected: [Record] = []
             var request = QueryRequest(recordType: "Event", sort: [QuerySort(field: "date")], limit: 3)
 
             for _ in 0..<5 {
@@ -144,7 +144,7 @@ final class RecordQueryTests: XCTestCase {
             let events = (0..<10).map { _ in makeEvent(name: "tick", date: sameInstant) }
             try await write(events, to: app)
 
-            var collected: [RecordDTO] = []
+            var collected: [Record] = []
             var request = QueryRequest(recordType: "Event", sort: [QuerySort(field: "date")], limit: 3)
 
             for _ in 0..<10 {

@@ -8,17 +8,17 @@
 import Vapor
 
 /// Wire representation of a single record.
-struct RecordDTO: Content, Equatable {
+struct Record: Content, Equatable {
     let recordType: String
     let recordName: String
     var fields: [String: FieldValue]
 }
 
-extension RecordDTO {
+extension Record {
     /// Restricts the payload to the requested fields. A `nil` list keeps
     /// every field.
     ///
-    func keeping(fields desired: [String]?) -> RecordDTO {
+    func keeping(fields desired: [String]?) -> Record {
         guard let desired else {
             return self
         }
@@ -30,7 +30,7 @@ extension RecordDTO {
 }
 
 struct WriteRequest: Content {
-    let records: [RecordDTO]
+    let records: [Record]
 }
 
 struct WriteResponse: Content {

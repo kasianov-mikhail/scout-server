@@ -54,11 +54,11 @@ func utcDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: I
     ).date!
 }
 
-func makeRecord(type: String, name recordName: String = UUID().uuidString, fields: [String: FieldValue]) -> RecordDTO {
-    RecordDTO(recordType: type, recordName: recordName, fields: fields)
+func makeRecord(type: String, name recordName: String = UUID().uuidString, fields: [String: FieldValue]) -> Record {
+    Record(recordType: type, recordName: recordName, fields: fields)
 }
 
-func makeEvent(name: String, date: Date, level: String = "info", sessionID: String = UUID().uuidString, installID: String = UUID().uuidString) -> RecordDTO {
+func makeEvent(name: String, date: Date, level: String = "info", sessionID: String = UUID().uuidString, installID: String = UUID().uuidString) -> Record {
     makeRecord(
         type: "Event",
         fields: [
@@ -80,7 +80,7 @@ func makeEvent(name: String, date: Date, level: String = "info", sessionID: Stri
     )
 }
 
-func makeSession(start: Date, installID: String, sessionID: String = UUID().uuidString) -> RecordDTO {
+func makeSession(start: Date, installID: String, sessionID: String = UUID().uuidString) -> Record {
     makeRecord(
         type: "Session",
         name: sessionID,
@@ -99,7 +99,7 @@ func makeSession(start: Date, installID: String, sessionID: String = UUID().uuid
     )
 }
 
-func makeMetric(type: String = "IntMetric", name: String, category: String, date: Date, value: FieldValue) -> RecordDTO {
+func makeMetric(type: String = "IntMetric", name: String, category: String, date: Date, value: FieldValue) -> Record {
     makeRecord(
         type: type,
         fields: [
@@ -119,7 +119,7 @@ func makeMetric(type: String = "IntMetric", name: String, category: String, date
 
 // MARK: - Requests
 
-func write(_ records: [RecordDTO], to app: Application) async throws {
+func write(_ records: [Record], to app: Application) async throws {
     try await app.test(
         .POST, "api/v1/records",
         headers: .authorized,

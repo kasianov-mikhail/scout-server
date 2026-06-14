@@ -56,7 +56,7 @@ enum RecordQueryService {
         let models = try await builder.range(cursor.offset..<(cursor.offset + limit + 1)).all()
 
         let hasMore = models.count > limit
-        let page = models.prefix(limit).map { $0.dto.keeping(fields: query.fields) }
+        let page = models.prefix(limit).map { $0.wire.keeping(fields: query.fields) }
 
         return QueryResponse(
             records: Array(page),

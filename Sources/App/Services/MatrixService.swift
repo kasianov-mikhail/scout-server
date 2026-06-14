@@ -43,7 +43,7 @@ enum MatrixService {
 
         let constraints = try MatrixConstraints(filters: request.filters ?? [])
 
-        let records: [RecordDTO] =
+        let records: [Record] =
             switch recordType {
             case intMatrixType:
                 try await intMatrices(constraints, on: database)
@@ -63,12 +63,12 @@ enum MatrixService {
 
     // MARK: - DateIntMatrix / DateDoubleMatrix
 
-    private static func intMatrices(_ constraints: MatrixConstraints, on database: any Database) async throws -> [RecordDTO] {
+    private static func intMatrices(_ constraints: MatrixConstraints, on database: any Database) async throws -> [Record] {
         let buckets = try await intBuckets(constraints, on: database)
         return assemble(buckets, recordType: intMatrixType, constraints: constraints) { .int($0.totalInt ?? 0) }
     }
 
-    private static func doubleMatrices(_ constraints: MatrixConstraints, on database: any Database) async throws -> [RecordDTO] {
+    private static func doubleMatrices(_ constraints: MatrixConstraints, on database: any Database) async throws -> [Record] {
         let buckets = try await doubleBuckets(constraints, on: database)
         return assemble(buckets, recordType: doubleMatrixType, constraints: constraints) { .double($0.totalDouble ?? 0) }
     }
@@ -164,7 +164,7 @@ enum MatrixService {
     /// Folds hour buckets into one record per (name, category, week), with
     /// `cell_<weekday>_<hour>` keys identical to the client's `GridCell`.
     ///
-    private static func assemble(_ buckets: [MatrixBucket], recordType: String, constraints: MatrixConstraints, value: (MatrixBucket) -> FieldValue) -> [RecordDTO] {
+    private static func assemble(_ buckets: [MatrixBucket], recordType: String, constraints: MatrixConstraints, value: (MatrixBucket) -> FieldValue) -> [Record] {
         var matrices: [MatrixKey: [String: FieldValue]] = [:]
 
         for bucket in buckets {
@@ -194,7 +194,7 @@ enum MatrixService {
             if let category = key.category {
                 fields["category"] = .string(category)
             }
-            return RecordDTO(
+            return Record(
                 recordType: recordType,
                 recordName: recordName(type: recordType, name: key.name, category: key.category, date: key.week),
                 fields: fields
