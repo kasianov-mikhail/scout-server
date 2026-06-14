@@ -48,7 +48,7 @@ final class UUIDv7Tests: XCTestCase {
         XCTAssertEqual(ids.count, count, "random tail must keep ids unique within a millisecond")
     }
 
-    /// Proves Fluent persists the id we assign in `RecordModel(dto:)` rather
+    /// Proves Fluent persists the id we assign in `RecordModel(_:)` rather
     /// than substituting its own random version 4.
     func testPersistedRecordIdsUseVersion7() async throws {
         try await withApp { app in

@@ -85,15 +85,15 @@ final class RecordModel: Model, @unchecked Sendable {
     init() {}
 }
 
-// MARK: - DTO Mapping
+// MARK: - Wire Mapping
 
 extension RecordModel {
-    convenience init(dto: RecordDTO) {
+    convenience init(_ record: Record) {
         self.init()
         id = UUID.v7()
-        recordType = dto.recordType
-        recordName = dto.recordName
-        apply(fields: dto.fields)
+        recordType = record.recordType
+        recordName = record.recordName
+        apply(fields: record.fields)
     }
 
     /// Replaces the payload and re-extracts the queryable columns.
@@ -132,8 +132,8 @@ extension RecordModel {
         }
     }
 
-    var dto: RecordDTO {
-        RecordDTO(recordType: recordType, recordName: recordName, fields: payload)
+    var wire: Record {
+        Record(recordType: recordType, recordName: recordName, fields: payload)
     }
 }
 

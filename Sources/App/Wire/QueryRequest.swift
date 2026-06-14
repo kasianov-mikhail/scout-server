@@ -45,6 +45,6 @@ struct QuerySort: Codable, Equatable, Sendable {
 }
 
 struct QueryResponse: Content {
-    let records: [RecordDTO]
+    let records: [Record]
     let cursor: String?
 }

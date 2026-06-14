@@ -47,14 +47,14 @@ struct RecordController: RouteCollection {
 
             var fresh: [String: RecordModel] = [:]
 
-            for dto in body.records {
-                if let model = byName[dto.recordName] {
-                    model.apply(fields: dto.fields)
+            for record in body.records {
+                if let model = byName[record.recordName] {
+                    model.apply(fields: record.fields)
                     try await model.save(on: db)
-                } else if let model = fresh[dto.recordName] {
-                    model.apply(fields: dto.fields)
+                } else if let model = fresh[record.recordName] {
+                    model.apply(fields: record.fields)
                 } else {
-                    fresh[dto.recordName] = RecordModel(dto: dto)
+                    fresh[record.recordName] = RecordModel(record)
                 }
             }
 
@@ -74,7 +74,7 @@ struct RecordController: RouteCollection {
         return try await RecordQueryService.run(query, on: req.db)
     }
 
-    func lookup(req: Request) async throws -> RecordDTO {
+    func lookup(req: Request) async throws -> Record {
         guard let recordName = req.parameters.get("recordName") else {
             throw Abort(.badRequest)
         }
@@ -85,6 +85,6 @@ struct RecordController: RouteCollection {
 
         let fields = req.query[String.self, at: "fields"].map { $0.split(separator: ",").map(String.init) }
 
-        return model.dto.keeping(fields: fields)
+        return model.wire.keeping(fields: fields)
     }
 }
