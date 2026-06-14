@@ -42,7 +42,10 @@ public func configure(_ app: Application) async throws {
 
     try routes(app)
 
+    app.telegramNotifier = TelegramNotifier.fromEnvironment(client: app.client, logger: app.logger)
+
     if app.environment != .testing {
         try await app.autoMigrate()
+        await app.telegramNotifier?.serverDidStart()
     }
 }
