@@ -35,7 +35,9 @@ first visit — there is no headless setup.
      The password is in `/opt/scout/.env` on the server. `/healthz` does not
      touch the database, so this is the only signal that Postgres is healthy.
 3. Add a **Telegram** notification (Settings → Notifications) and attach it to
-   both monitors. To keep recoveries quiet and only ring on failures, use two
-   Telegram notifications — one with "Send Silently" off (assign to alerts) and
-   one with it on — or drive alerts from a custom script with
-   `disable_notification`.
+   both monitors. Kuma fires a notification on both outage and recovery, and the
+   built-in Telegram type's "Send Silently" toggle applies globally to all of
+   its messages — so it cannot ring only on failures. Use one channel with
+   "Send Silently" off (sound on outage and recovery alike). To mute recoveries
+   specifically, use a **Webhook** notification pointing at a small relay that
+   sets `disable_notification` per event instead.
