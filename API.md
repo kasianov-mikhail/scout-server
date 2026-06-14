@@ -81,21 +81,28 @@ The native, pre-aggregated DAU/WAU/MAU series. The server derives active-user co
 
 ## `GET /api/v1/metrics/series`
 
-A flat, pre-aggregated value-per-bucket series for a single name — the time-axis counterpart of the `DateIntMatrix` / `DateDoubleMatrix` grid. The same raw records feed both: record counts for lifecycle types (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`) and event names, value sums for `IntMetric` / `DoubleMetric` names.
+Flat, pre-aggregated value-per-bucket series grouped by name — the time-axis counterpart of the `DateIntMatrix` / `DateDoubleMatrix` grid. The same raw records feed both: record counts for lifecycle types (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`) and event names, value sums for `IntMetric` / `DoubleMetric` names. Omit `name` to get every name at once — enough to populate a whole category's charts from one request.
 
 | Parameter | Meaning |
 | --- | --- |
-| `name` | Required. The lifecycle type, event name, or metric name to aggregate. |
-| `category` | Optional. Narrows metric names to one telemetry category. |
+| `name` | Optional. Restricts the result to a single lifecycle type, event name, or metric name. |
+| `category` | Optional. Restricts the result to one telemetry category. |
+| `values` | `int` or `double` — selects the value flavor (`DateIntMatrix` vs `DateDoubleMatrix`). Inferred when omitted, preferring `int`. |
 | `bucket` | `hour`, `day`, or `week` (default `day`). `week` starts on Sunday. |
 | `from` / `to` | Half-open `[from, to)` range in milliseconds since the Unix epoch; `to` defaults to now and `from` to 90 days earlier. |
 
-The response carries one point per bucket over the range (empty buckets included, so the series is dense), each a typed `value` — `int` for counts and `IntMetric` sums, `double` for `DoubleMetric` sums. The range snaps down to the bucket containing `from`, so the first bucket is whole.
+The response carries one `series` entry per name, each with a dense list of points over the range (empty buckets included). Every point has a typed `value` — `int` for counts and `IntMetric` sums, `double` for `DoubleMetric` sums. The range snaps down to the bucket containing `from`, so the first bucket is whole.
 
 ```json
 {
   "series": [
-    {"date": 1780272000000, "value": {"int": 42}}
+    {
+      "name": "api_calls",
+      "category": "counter",
+      "points": [
+        {"date": 1780272000000, "value": {"int": 42}}
+      ]
+    }
   ]
 }
 ```

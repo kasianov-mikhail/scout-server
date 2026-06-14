@@ -10,7 +10,7 @@ import Vapor
 
 /// Serves pre-aggregated metric series natively: the server aggregates raw
 /// records and answers with finished series — the DAU/WAU/MAU active-user
-/// counts and a flat value-per-bucket series for any single name.
+/// counts and flat value-per-bucket series grouped by name.
 ///
 struct MetricsController: RouteCollection {
     /// Span used when the caller omits `from`: the trailing 90 days.
@@ -39,17 +39,24 @@ struct MetricsController: RouteCollection {
         return ActiveUsersResponse(series: series)
     }
 
-    /// `GET /metrics/series?name=<name>&category=<cat>&bucket=hour|day|week&from=<ms>&to=<ms>`
-    /// — a flat, dense value-per-bucket series for one metric, event, or
-    /// lifecycle name, the time-axis counterpart of the matrix grid. `name` is
-    /// required, `category` and `bucket` (default `day`) optional; the range
-    /// defaults to the trailing 90 days, like `activeUsers`.
+    /// `GET /metrics/series?name=<name>&category=<cat>&values=int|double&bucket=hour|day|week&from=<ms>&to=<ms>`
+    /// — flat, dense value-per-bucket series grouped by name, the time-axis
+    /// counterpart of the matrix grid. `name` and `category` filter the result
+    /// (omit `name` to get every name at once); `values` forces the flavor and
+    /// is inferred when omitted; `bucket` defaults to `day`; the range defaults
+    /// to the trailing 90 days, like `activeUsers`.
     ///
     func series(req: Request) async throws -> MetricSeriesResponse {
-        guard let name = req.query[String.self, at: "name"], !name.isEmpty else {
-            throw Abort(.badRequest, reason: "Query parameter 'name' is required")
-        }
+        let name = req.query[String.self, at: "name"].flatMap { $0.isEmpty ? nil : $0 }
         let category = req.query[String.self, at: "category"].flatMap { $0.isEmpty ? nil : $0 }
+
+        var values: MetricSeriesService.Flavor?
+        if let raw = req.query[String.self, at: "values"] {
+            guard let flavor = MetricSeriesService.Flavor(rawValue: raw) else {
+                throw Abort(.badRequest, reason: "Unknown values '\(raw)'; expected int or double")
+            }
+            values = flavor
+        }
 
         let bucketName = req.query[String.self, at: "bucket"] ?? MetricSeriesService.Bucket.day.rawValue
         guard let bucket = MetricSeriesService.Bucket(rawValue: bucketName) else {
@@ -63,7 +70,7 @@ struct MetricsController: RouteCollection {
             throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
         }
 
-        let series = try await MetricSeriesService.series(name: name, category: category, bucket: bucket, from: from, to: to, on: req.db)
+        let series = try await MetricSeriesService.series(name: name, category: category, values: values, bucket: bucket, from: from, to: to, on: req.db)
         return MetricSeriesResponse(series: series)
     }
 

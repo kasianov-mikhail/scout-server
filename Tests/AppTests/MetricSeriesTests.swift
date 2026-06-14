@@ -10,14 +10,18 @@ import XCTVapor
 @testable import App
 
 /// `GET /metrics/series` flattens the same raw records that feed the
-/// `DateIntMatrix` / `DateDoubleMatrix` grid onto a single time axis: one
-/// dense point per bucket for a single name, counts as `.int` and metric sums
-/// as `.double`. 2026-06-10 is a Wednesday; its week starts Sunday 2026-06-07.
+/// `DateIntMatrix` / `DateDoubleMatrix` grid onto a single time axis, grouped
+/// by name: counts as `.int`, metric sums as `.double`, one dense series per
+/// name. 2026-06-10 is a Wednesday; its week starts Sunday 2026-06-07.
 ///
 final class MetricSeriesTests: XCTestCase {
-    func value(_ series: [MetricSeriesPoint], _ date: Date) -> FieldValue? {
+    func group(_ series: [MetricSeries], _ name: String) -> MetricSeries? {
+        series.first { $0.name == name }
+    }
+
+    func value(_ series: MetricSeries?, _ date: Date) -> FieldValue? {
         let ms = Int64((date.timeIntervalSince1970 * 1000).rounded())
-        return series.first { $0.date == ms }?.value
+        return series?.points.first { $0.date == ms }?.value
     }
 
     func testEventCountsBecomeDailySeries() async throws {
@@ -37,7 +41,28 @@ final class MetricSeriesTests: XCTestCase {
             )
 
             XCTAssertEqual(series.count, 1)
-            XCTAssertEqual(value(series, utcDate(2026, 6, 10)), .int(3))
+            XCTAssertEqual(value(group(series, "login"), utcDate(2026, 6, 10)), .int(3))
+        }
+    }
+
+    func testAllNamesInOneRequest() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeEvent(name: "login", date: utcDate(2026, 6, 10, 9)),
+                    makeEvent(name: "login", date: utcDate(2026, 6, 10, 10)),
+                    makeEvent(name: "logout", date: utcDate(2026, 6, 10, 11)),
+                ],
+                to: app
+            )
+
+            let series = try await metricSeries(
+                values: "int", from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            XCTAssertEqual(Set(series.map(\.name)), ["login", "logout"])
+            XCTAssertEqual(value(group(series, "login"), utcDate(2026, 6, 10)), .int(2))
+            XCTAssertEqual(value(group(series, "logout"), utcDate(2026, 6, 10)), .int(1))
         }
     }
 
@@ -49,10 +74,11 @@ final class MetricSeriesTests: XCTestCase {
                 name: "login", from: utcDate(2026, 6, 9), to: utcDate(2026, 6, 12), on: app
             )
 
-            XCTAssertEqual(series.count, 3)
-            XCTAssertEqual(value(series, utcDate(2026, 6, 9)), .int(0))
-            XCTAssertEqual(value(series, utcDate(2026, 6, 10)), .int(1))
-            XCTAssertEqual(value(series, utcDate(2026, 6, 11)), .int(0))
+            let login = group(series, "login")
+            XCTAssertEqual(login?.points.count, 3)
+            XCTAssertEqual(value(login, utcDate(2026, 6, 9)), .int(0))
+            XCTAssertEqual(value(login, utcDate(2026, 6, 10)), .int(1))
+            XCTAssertEqual(value(login, utcDate(2026, 6, 11)), .int(0))
         }
     }
 
@@ -72,9 +98,10 @@ final class MetricSeriesTests: XCTestCase {
                 from: utcDate(2026, 6, 10, 9), to: utcDate(2026, 6, 10, 11), on: app
             )
 
-            XCTAssertEqual(series.count, 2)
-            XCTAssertEqual(value(series, utcDate(2026, 6, 10, 9)), .int(2))
-            XCTAssertEqual(value(series, utcDate(2026, 6, 10, 10)), .int(1))
+            let login = group(series, "login")
+            XCTAssertEqual(login?.points.count, 2)
+            XCTAssertEqual(value(login, utcDate(2026, 6, 10, 9)), .int(2))
+            XCTAssertEqual(value(login, utcDate(2026, 6, 10, 10)), .int(1))
         }
     }
 
@@ -93,9 +120,10 @@ final class MetricSeriesTests: XCTestCase {
                 from: utcDate(2026, 6, 7), to: utcDate(2026, 6, 21), on: app
             )
 
-            XCTAssertEqual(series.count, 2)
-            XCTAssertEqual(value(series, utcDate(2026, 6, 7)), .int(1))
-            XCTAssertEqual(value(series, utcDate(2026, 6, 14)), .int(1))
+            let login = group(series, "login")
+            XCTAssertEqual(login?.points.count, 2)
+            XCTAssertEqual(value(login, utcDate(2026, 6, 7)), .int(1))
+            XCTAssertEqual(value(login, utcDate(2026, 6, 14)), .int(1))
         }
     }
 
@@ -113,7 +141,7 @@ final class MetricSeriesTests: XCTestCase {
                 name: "Session", from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
             )
 
-            XCTAssertEqual(value(series, utcDate(2026, 6, 10)), .int(2))
+            XCTAssertEqual(value(group(series, "Session"), utcDate(2026, 6, 10)), .int(2))
         }
     }
 
@@ -123,17 +151,18 @@ final class MetricSeriesTests: XCTestCase {
                 [
                     makeMetric(name: "requests", category: "counter", date: utcDate(2026, 6, 10, 9, 1), value: .int(5)),
                     makeMetric(name: "requests", category: "counter", date: utcDate(2026, 6, 10, 15, 0), value: .int(7)),
-                    makeMetric(name: "requests", category: "meter", date: utcDate(2026, 6, 10, 9, 0), value: .int(99)),
+                    makeMetric(name: "errors", category: "meter", date: utcDate(2026, 6, 10, 9, 0), value: .int(99)),
                 ],
                 to: app
             )
 
             let series = try await metricSeries(
-                name: "requests", category: "counter",
+                category: "counter", values: "int",
                 from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
             )
 
-            XCTAssertEqual(value(series, utcDate(2026, 6, 10)), .int(12))
+            XCTAssertEqual(series.map(\.name), ["requests"])
+            XCTAssertEqual(value(group(series, "requests"), utcDate(2026, 6, 10)), .int(12))
         }
     }
 
@@ -148,18 +177,18 @@ final class MetricSeriesTests: XCTestCase {
             )
 
             let series = try await metricSeries(
-                name: "duration", category: "timer",
+                category: "timer", values: "double",
                 from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
             )
 
-            XCTAssertEqual(value(series, utcDate(2026, 6, 10)), .double(1.75))
+            XCTAssertEqual(value(group(series, "duration"), utcDate(2026, 6, 10)), .double(1.75))
         }
     }
 
-    func testMissingNameIsRejected() async throws {
+    func testUnknownBucketIsRejected() async throws {
         try await withApp { app in
             try await app.test(
-                .GET, "api/v1/metrics/series?from=0&to=1",
+                .GET, "api/v1/metrics/series?name=login&bucket=fortnight&from=0&to=1",
                 headers: .authorized,
                 afterResponse: { res async in
                     XCTAssertEqual(res.status, .badRequest)
@@ -168,10 +197,10 @@ final class MetricSeriesTests: XCTestCase {
         }
     }
 
-    func testUnknownBucketIsRejected() async throws {
+    func testUnknownValuesIsRejected() async throws {
         try await withApp { app in
             try await app.test(
-                .GET, "api/v1/metrics/series?name=login&bucket=fortnight&from=0&to=1",
+                .GET, "api/v1/metrics/series?values=decimal&from=0&to=1",
                 headers: .authorized,
                 afterResponse: { res async in
                     XCTAssertEqual(res.status, .badRequest)

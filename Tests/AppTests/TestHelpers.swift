@@ -163,11 +163,13 @@ func activeUsers(from: Date, to: Date, on app: Application) async throws -> [Act
     return response!.series
 }
 
-func metricSeries(name: String, category: String? = nil, bucket: String? = nil, from: Date, to: Date, on app: Application) async throws -> [MetricSeriesPoint] {
+func metricSeries(name: String? = nil, category: String? = nil, values: String? = nil, bucket: String? = nil, from: Date, to: Date, on app: Application) async throws -> [MetricSeries] {
     let fromMs = Int64((from.timeIntervalSince1970 * 1000).rounded())
     let toMs = Int64((to.timeIntervalSince1970 * 1000).rounded())
-    var path = "api/v1/metrics/series?name=\(name)&from=\(fromMs)&to=\(toMs)"
+    var path = "api/v1/metrics/series?from=\(fromMs)&to=\(toMs)"
+    if let name { path += "&name=\(name)" }
     if let category { path += "&category=\(category)" }
+    if let values { path += "&values=\(values)" }
     if let bucket { path += "&bucket=\(bucket)" }
 
     var response: MetricSeriesResponse?
