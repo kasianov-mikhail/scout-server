@@ -44,7 +44,7 @@ Migrations run automatically on boot.
 
 ## API
 
-The server exposes a small, CloudKit-compatible HTTP API under `/api/v1` for uploading and querying records. The contract is an OpenAPI document, [`openapi.yaml`](Sources/App/openapi.yaml), served live at `GET /openapi.yaml`. The server's request and response types are generated from it at build time with [Swift OpenAPI Generator](https://github.com/apple/swift-openapi-generator), so the spec cannot drift from the implementation. See [API.md](API.md) for a prose walkthrough.
+The server exposes a small, CloudKit-compatible HTTP API under `/api/v1` for uploading and querying records. See [API.md](API.md) for the full reference.
 
 ## Development
 
