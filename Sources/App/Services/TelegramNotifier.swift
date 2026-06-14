@@ -21,10 +21,11 @@ struct TelegramNotifier: Sendable {
     let logger: Logger
 
     /// Builds a notifier from the environment, or `nil` when the bot
-    /// credentials are not configured.
+    /// credentials are unset or empty — Compose passes an absent `${VAR:-}` as
+    /// an empty string, which must read as "not configured", not a broken token.
     ///
     static func fromEnvironment(client: any Client, logger: Logger) -> TelegramNotifier? {
-        guard let token = Environment.get("TELEGRAM_BOT_TOKEN"), let chatID = Environment.get("TELEGRAM_CHAT_ID") else {
+        guard let token = Environment.get("TELEGRAM_BOT_TOKEN"), token.count > 0, let chatID = Environment.get("TELEGRAM_CHAT_ID"), chatID.count > 0 else {
             return nil
         }
         return TelegramNotifier(token: token, chatID: chatID, client: client, logger: logger)
