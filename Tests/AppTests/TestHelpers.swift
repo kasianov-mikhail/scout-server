@@ -163,7 +163,7 @@ func activeUsers(from: Date, to: Date, on app: Application) async throws -> [Act
     return response!.series
 }
 
-func metricSeries(name: String? = nil, category: String? = nil, values: String? = nil, bucket: String? = nil, from: Date, to: Date, on app: Application) async throws -> [MetricSeries] {
+func metricSeries(name: String? = nil, category: String? = nil, values: String? = nil, bucket: String? = nil, dense: Bool? = nil, from: Date, to: Date, on app: Application) async throws -> [MetricSeries] {
     let fromMs = Int64((from.timeIntervalSince1970 * 1000).rounded())
     let toMs = Int64((to.timeIntervalSince1970 * 1000).rounded())
     var path = "api/v1/metrics/series?from=\(fromMs)&to=\(toMs)"
@@ -171,6 +171,7 @@ func metricSeries(name: String? = nil, category: String? = nil, values: String? 
     if let category { path += "&category=\(category)" }
     if let values { path += "&values=\(values)" }
     if let bucket { path += "&bucket=\(bucket)" }
+    if let dense { path += "&dense=\(dense)" }
 
     var response: MetricSeriesResponse?
     try await app.test(

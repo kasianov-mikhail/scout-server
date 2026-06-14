@@ -39,12 +39,13 @@ struct MetricsController: RouteCollection {
         return ActiveUsersResponse(series: series)
     }
 
-    /// `GET /metrics/series?name=<name>&category=<cat>&values=int|double&bucket=hour|day|week&from=<ms>&to=<ms>`
-    /// — flat, dense value-per-bucket series grouped by name, the time-axis
+    /// `GET /metrics/series?name=<name>&category=<cat>&values=int|double&bucket=hour|day|week&dense=<bool>&from=<ms>&to=<ms>`
+    /// — flat value-per-bucket series grouped by name, the time-axis
     /// counterpart of the matrix grid. `name` and `category` filter the result
     /// (omit `name` to get every name at once); `values` forces the flavor and
-    /// is inferred when omitted; `bucket` defaults to `day`; the range defaults
-    /// to the trailing 90 days, like `activeUsers`.
+    /// is inferred when omitted; `bucket` defaults to `day`; `dense` (default
+    /// `true`) zero-fills every bucket, set it `false` to emit only buckets
+    /// with data; the range defaults to the trailing 90 days, like `activeUsers`.
     ///
     func series(req: Request) async throws -> MetricSeriesResponse {
         let name = req.query[String.self, at: "name"].flatMap { $0.isEmpty ? nil : $0 }
@@ -63,6 +64,10 @@ struct MetricsController: RouteCollection {
             throw Abort(.badRequest, reason: "Unknown bucket '\(bucketName)'; expected hour, day, or week")
         }
 
+        // Vapor decodes a missing Bool query parameter as `false`, so read it
+        // as a string and default the absent case to dense.
+        let dense = req.query[String.self, at: "dense"] != "false"
+
         let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
         let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
 
@@ -70,7 +75,7 @@ struct MetricsController: RouteCollection {
             throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
         }
 
-        let series = try await MetricSeriesService.series(name: name, category: category, values: values, bucket: bucket, from: from, to: to, on: req.db)
+        let series = try await MetricSeriesService.series(name: name, category: category, values: values, bucket: bucket, from: from, to: to, dense: dense, on: req.db)
         return MetricSeriesResponse(series: series)
     }
 

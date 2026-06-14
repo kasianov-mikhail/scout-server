@@ -53,13 +53,15 @@ enum MetricSeriesService {
     }
 
     /// One `MetricSeries` per name matching the `name` / `category` filters,
-    /// each a dense point-per-bucket series over the half-open `[from, to)`
-    /// range. The range snaps down to the bucket containing `from`, so the
-    /// first bucket is whole. `values` forces the flavor; when omitted it is
+    /// each a point-per-bucket series over the half-open `[from, to)` range.
+    /// The range snaps down to the bucket containing `from`, so the first
+    /// bucket is whole. `values` forces the flavor; when omitted it is
     /// inferred, with integer counts/sums taking precedence (matching
-    /// `DateIntMatrix`).
+    /// `DateIntMatrix`). When `dense` is true every bucket is emitted
+    /// (zero-filled); when false only buckets with data are, keeping a fine
+    /// granularity over a long range compact.
     ///
-    static func series(name: String?, category: String?, values: Flavor?, bucket: Bucket, from: Date, to: Date, on database: any Database) async throws -> [MetricSeries] {
+    static func series(name: String?, category: String?, values: Flavor?, bucket: Bucket, from: Date, to: Date, dense: Bool, on database: any Database) async throws -> [MetricSeries] {
         let start = bucket.start(of: from)
 
         var constraints = MatrixConstraints(dateRange: start..<to)
@@ -83,7 +85,7 @@ enum MetricSeriesService {
                 MetricSeries(
                     name: key.name,
                     category: key.category,
-                    points: densePoints(rows, flavor: flavor, bucket: bucket, from: start, to: to)
+                    points: seriesPoints(rows, flavor: flavor, bucket: bucket, from: start, to: to, dense: dense)
                 )
             }
             .sorted { ($0.name, $0.category ?? "") < ($1.name, $1.category ?? "") }
@@ -113,10 +115,11 @@ enum MetricSeriesService {
         }
     }
 
-    /// Folds one name's hourly buckets into the requested granularity and
-    /// zero-fills every bucket across the range.
+    /// Folds one name's hourly buckets into the requested granularity. A dense
+    /// series walks every bucket across the range (zero-filling gaps); a sparse
+    /// one emits only the buckets that carried data, in ascending order.
     ///
-    private static func densePoints(_ rows: [MatrixBucket], flavor: Flavor, bucket: Bucket, from start: Date, to: Date) -> [MetricSeriesPoint] {
+    private static func seriesPoints(_ rows: [MatrixBucket], flavor: Flavor, bucket: Bucket, from start: Date, to: Date, dense: Bool) -> [MetricSeriesPoint] {
         var ints: [Date: Int64] = [:]
         var doubles: [Date: Double] = [:]
         for row in rows {
@@ -127,14 +130,21 @@ enum MetricSeriesService {
             }
         }
 
+        func point(at bucketStart: Date) -> MetricSeriesPoint {
+            let value: FieldValue =
+                flavor == .int ? .int(ints[bucketStart] ?? 0) : .double(doubles[bucketStart] ?? 0)
+            return MetricSeriesPoint(date: Int64((bucketStart.timeIntervalSince1970 * 1000).rounded()), value: value)
+        }
+
+        guard dense else {
+            let keys = flavor == .int ? Array(ints.keys) : Array(doubles.keys)
+            return keys.sorted().map(point)
+        }
+
         var points: [MetricSeriesPoint] = []
         var cursor = start
         while cursor < to {
-            let value: FieldValue =
-                flavor == .int ? .int(ints[cursor] ?? 0) : .double(doubles[cursor] ?? 0)
-            points.append(
-                MetricSeriesPoint(date: Int64((cursor.timeIntervalSince1970 * 1000).rounded()), value: value)
-            )
+            points.append(point(at: cursor))
             cursor = Calendar.utc.date(byAdding: bucket.component, value: 1, to: cursor)!
         }
         return points

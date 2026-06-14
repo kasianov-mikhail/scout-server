@@ -82,6 +82,32 @@ final class MetricSeriesTests: XCTestCase {
         }
     }
 
+    func testSparseOmitsEmptyBuckets() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeEvent(name: "login", date: utcDate(2026, 6, 10, 9)),
+                    makeEvent(name: "login", date: utcDate(2026, 6, 12, 9)),
+                ],
+                to: app
+            )
+
+            let series = try await metricSeries(
+                name: "login", dense: false,
+                from: utcDate(2026, 6, 9), to: utcDate(2026, 6, 14), on: app
+            )
+
+            let login = group(series, "login")
+            // Only the two days with data, in ascending order — no zero days.
+            XCTAssertEqual(login?.points.map(\.date), [
+                Int64(utcDate(2026, 6, 10).timeIntervalSince1970 * 1000),
+                Int64(utcDate(2026, 6, 12).timeIntervalSince1970 * 1000),
+            ])
+            XCTAssertEqual(value(login, utcDate(2026, 6, 10)), .int(1))
+            XCTAssertEqual(value(login, utcDate(2026, 6, 12)), .int(1))
+        }
+    }
+
     func testHourBucketResolution() async throws {
         try await withApp { app in
             try await write(

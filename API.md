@@ -89,9 +89,10 @@ Flat, pre-aggregated value-per-bucket series grouped by name — the time-axis c
 | `category` | Optional. Restricts the result to one telemetry category. |
 | `values` | `int` or `double` — selects the value flavor (`DateIntMatrix` vs `DateDoubleMatrix`). Inferred when omitted, preferring `int`. |
 | `bucket` | `hour`, `day`, or `week` (default `day`). `week` starts on Sunday. |
+| `dense` | `true` (default) emits every bucket over the range, zero-filling gaps; `false` emits only buckets with data — keeping a fine `bucket` over a long range compact. |
 | `from` / `to` | Half-open `[from, to)` range in milliseconds since the Unix epoch; `to` defaults to now and `from` to 90 days earlier. |
 
-The response carries one `series` entry per name, each with a dense list of points over the range (empty buckets included). Every point has a typed `value` — `int` for counts and `IntMetric` sums, `double` for `DoubleMetric` sums. The range snaps down to the bucket containing `from`, so the first bucket is whole.
+The response carries one `series` entry per name, each with a list of points over the range. Every point has a typed `value` — `int` for counts and `IntMetric` sums, `double` for `DoubleMetric` sums. The range snaps down to the bucket containing `from`, so the first bucket is whole.
 
 ```json
 {
