@@ -20,8 +20,6 @@ enum Entrypoint {
             try await app.execute()
         } catch {
             app.logger.report(error: error)
-            let notifier = app.telegramNotifier ?? .fromEnvironment(client: app.client, logger: app.logger)
-            await notifier?.serverDidFail(error)
             try? await app.asyncShutdown()
             throw error
         }
