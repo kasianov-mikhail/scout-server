@@ -13,39 +13,13 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
-    name: Build & Test
-    runs-on: ubuntu-latest
-    container: swift:6.3-noble
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # The Swift version is part of the key: build artifacts produced by a
-      # different compiler poison incremental builds with bogus module
-      # visibility errors.
-      - name: Swift version
-        id: swift
-        run: echo "version=$(swift --version | head -1 | tr -d ' ')" >> "$GITHUB_OUTPUT"
-
-      - name: Cache SwiftPM
-        uses: actions/cache@v4
-        with:
-          path: .build
-          key: spm-${{ steps.swift.outputs.version }}-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            spm-${{ steps.swift.outputs.version }}-
-
-      - name: Build
-        run: swift build --build-tests
-
-      - name: Test
-        run: swift test --skip-build
-
-  # The suite above runs on in-memory SQLite for speed; this job reruns it
-  # against the real engine production uses, catching Postgres-only failures
-  # (strict types, JSON/JSONB, GROUP BY and ordering, migrations that only error
-  # on a strict server) that SQLite silently tolerates.
+  # Production runs on Postgres, so the suite runs against the real engine
+  # rather than the in-memory SQLite local dev defaults to. This catches
+  # Postgres-only failures (strict types, JSON/JSONB, GROUP BY and ordering,
+  # migrations that only error on a strict server) that SQLite silently
+  # tolerates. The Swift version is part of the cache key: build artifacts
+  # produced by a different compiler poison incremental builds with bogus
+  # module visibility errors.
   test-postgres:
     name: Build & Test (Postgres)
     runs-on: ubuntu-latest
