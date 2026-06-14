@@ -40,8 +40,8 @@ enum ActiveUserService {
 
     // MARK: - Native series
 
-    /// A flat DAU/WAU/MAU series — the aggregation-native shape HTTP backends
-    /// serve in place of the CloudKit `PeriodMatrix`. One point per UTC day in
+    /// A flat DAU/WAU/MAU series — the aggregation-native shape the server
+    /// serves directly. One point per UTC day in
     /// the half-open `[from, to)` range, each an as-of trailing distinct-install
     /// count (daily, 7-day, calendar-month). Zero-activity days are included so
     /// the result is a dense, directly chartable series.

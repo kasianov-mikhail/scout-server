@@ -162,3 +162,22 @@ func activeUsers(from: Date, to: Date, on app: Application) async throws -> [Act
     )
     return response!.series
 }
+
+func metricSeries(name: String, category: String? = nil, bucket: String? = nil, from: Date, to: Date, on app: Application) async throws -> [MetricSeriesPoint] {
+    let fromMs = Int64((from.timeIntervalSince1970 * 1000).rounded())
+    let toMs = Int64((to.timeIntervalSince1970 * 1000).rounded())
+    var path = "api/v1/metrics/series?name=\(name)&from=\(fromMs)&to=\(toMs)"
+    if let category { path += "&category=\(category)" }
+    if let bucket { path += "&bucket=\(bucket)" }
+
+    var response: MetricSeriesResponse?
+    try await app.test(
+        .GET, path,
+        headers: .authorized,
+        afterResponse: { res async throws in
+            XCTAssertEqual(res.status, .ok, res.body.string)
+            response = try res.content.decode(MetricSeriesResponse.self)
+        }
+    )
+    return response!.series
+}

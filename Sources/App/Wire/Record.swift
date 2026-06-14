@@ -7,7 +7,7 @@
 
 import Vapor
 
-/// Wire representation of a single record, mirroring a `CKRecord` on the client.
+/// Wire representation of a single record.
 struct Record: Content, Equatable {
     let recordType: String
     let recordName: String
@@ -15,8 +15,8 @@ struct Record: Content, Equatable {
 }
 
 extension Record {
-    /// Restricts the payload to the requested fields, mirroring
-    /// CloudKit's `desiredKeys`. A `nil` list keeps every field.
+    /// Restricts the payload to the requested fields. A `nil` list keeps
+    /// every field.
     ///
     func keeping(fields desired: [String]?) -> Record {
         guard let desired else {

@@ -7,8 +7,8 @@
 
 import Vapor
 
-/// The native active-user series an HTTP backend serves directly, without the
-/// CloudKit `PeriodMatrix` forward-mark bookkeeping the client maintains by hand.
+/// The native active-user series the server aggregates from raw records and
+/// serves directly.
 ///
 struct ActiveUsersResponse: Content, Equatable {
     let series: [ActiveUserPoint]

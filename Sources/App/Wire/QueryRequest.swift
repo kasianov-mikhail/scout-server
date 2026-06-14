@@ -7,7 +7,7 @@
 
 import Vapor
 
-/// A record query, the server-side counterpart of a `CKQuery`.
+/// A record query against the server's records.
 ///
 /// Either `recordType` (a fresh query) or `cursor` (continuation of a
 /// previous one) must be present.
