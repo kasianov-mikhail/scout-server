@@ -8,15 +8,15 @@
 import Fluent
 import Vapor
 
-/// Computes a flat, dense value-per-bucket series for one name.
+/// Computes name-grouped, value-per-bucket series.
 ///
 /// The same raw records that feed the `DateIntMatrix` / `DateDoubleMatrix`
-/// grid also feed this series — record counts for lifecycle and event names,
+/// grid also feed these series — record counts for lifecycle and event names,
 /// `IntMetric` / `DoubleMetric` value sums for metric names — but folded onto
 /// a single time axis instead of a weekday-by-hour grid. The hourly buckets
 /// `MatrixService` already produces are rolled up into the requested
-/// granularity and zero-filled across the range, giving a directly chartable
-/// series like `GET /api/v1/metrics/active-users`.
+/// granularity and grouped by name, so one request can carry a whole telemetry
+/// category.
 ///
 enum MetricSeriesService {
     /// The granularity of a series point. `week` starts on Sunday, matching
@@ -44,13 +44,18 @@ enum MetricSeriesService {
         }
     }
 
-    /// One dense point per `bucket` over the half-open `[from, to)` range. The
-    /// range snaps down to the bucket start containing `from`, so the first
-    /// bucket is whole; values are `.int` for counts and `IntMetric` sums,
-    /// `.double` for `DoubleMetric` sums. When a name carries both (an unusual
-    /// collision), the integer side wins, matching `DateIntMatrix` precedence.
+    /// One group per name over the half-open `[from, to)` range, each a sparse
+    /// list of `bucket`-aligned points. `name` and `category` narrow the result
+    /// (the controller requires at least one); `values` picks the flavor —
+    /// `int` for counts and `IntMetric` sums, `double` for `DoubleMetric` sums —
+    /// and is inferred per name when omitted, the integer side winning a
+    /// collision to match `DateIntMatrix` precedence.
     ///
-    static func series(name: String, category: String?, bucket: Bucket, from: Date, to: Date, on database: any Database) async throws -> [MetricSeriesPoint] {
+    /// Empty buckets are dropped, so every point is a real observation and a
+    /// year-wide category stays compact. The range snaps down to the bucket
+    /// containing `from`, so the first bucket is whole.
+    ///
+    static func series(name: String?, category: String?, values: String?, bucket: Bucket, from: Date, to: Date, on database: any Database) async throws -> [MetricSeriesGroup] {
         let start = bucket.start(of: from)
 
         var constraints = MatrixConstraints(dateRange: start..<to)
@@ -60,39 +65,71 @@ enum MetricSeriesService {
         // The hourly buckets over-fetch a week past `to` for grid alignment,
         // so drop anything at or after the range's upper bound here.
         let upper = Int64(to.timeIntervalSince1970)
-        let ints = try await MatrixService.intBuckets(constraints, on: database)
-        let doubles = try await MatrixService.doubleBuckets(constraints, on: database)
 
-        let intTotals = fold(ints, before: upper, bucket: bucket) { $0.totalInt ?? 0 }
-        let doubleTotals = fold(doubles, before: upper, bucket: bucket) { $0.totalDouble ?? 0 }
-
-        let useDouble = intTotals.isEmpty && !doubleTotals.isEmpty
-
-        var points: [MetricSeriesPoint] = []
-        var cursor = start
-        while cursor < to {
-            let value: FieldValue =
-                useDouble
-                ? .double(doubleTotals[cursor] ?? 0)
-                : .int(intTotals[cursor] ?? 0)
-            points.append(
-                MetricSeriesPoint(date: Int64((cursor.timeIntervalSince1970 * 1000).rounded()), value: value)
-            )
-            cursor = Calendar.utc.date(byAdding: bucket.component, value: 1, to: cursor)!
+        var intTotals: [GroupKey: [Date: Int64]] = [:]
+        if values != "double" {
+            let buckets = try await MatrixService.intBuckets(constraints, on: database)
+            intTotals = fold(buckets, before: upper, bucket: bucket) { $0.totalInt ?? 0 }
         }
 
-        return points
+        var doubleTotals: [GroupKey: [Date: Double]] = [:]
+        if values != "int" {
+            let buckets = try await MatrixService.doubleBuckets(constraints, on: database)
+            doubleTotals = fold(buckets, before: upper, bucket: bucket) { $0.totalDouble ?? 0 }
+        }
+
+        var groups: [MetricSeriesGroup] = []
+
+        for (key, totals) in intTotals {
+            let points = sparsePoints(totals) { .int($0) }
+            if points.count > 0 {
+                groups.append(MetricSeriesGroup(name: key.name, category: key.category, points: points))
+            }
+        }
+
+        for (key, totals) in doubleTotals {
+            // Inferred flavor: a name carried by the integer side wins, so skip
+            // its double counterpart rather than emit a duplicate group.
+            if values == nil, intTotals[key] != nil {
+                continue
+            }
+            let points = sparsePoints(totals) { .double($0) }
+            if points.count > 0 {
+                groups.append(MetricSeriesGroup(name: key.name, category: key.category, points: points))
+            }
+        }
+
+        return groups.sorted { ($0.name, $0.category ?? "") < ($1.name, $1.category ?? "") }
     }
 
-    /// Sums the hourly buckets into the requested granularity, keyed by the
-    /// bucket start, discarding hours at or after `before`.
+    /// Sums the hourly buckets into the requested granularity, keyed by name,
+    /// category, and bucket start, discarding hours at or after `before`.
     ///
-    private static func fold<T: AdditiveArithmetic>(_ buckets: [MatrixBucket], before: Int64, bucket: Bucket, value: (MatrixBucket) -> T) -> [Date: T] {
-        var totals: [Date: T] = [:]
+    private static func fold<T: AdditiveArithmetic & Equatable>(_ buckets: [MatrixBucket], before: Int64, bucket: Bucket, value: (MatrixBucket) -> T) -> [GroupKey: [Date: T]] {
+        var totals: [GroupKey: [Date: T]] = [:]
         for row in buckets where row.hour < before {
-            let key = bucket.start(of: Date(timeIntervalSince1970: Double(row.hour)))
-            totals[key, default: .zero] += value(row)
+            guard let name = row.name else {
+                continue
+            }
+            let key = GroupKey(name: name, category: row.category)
+            let bucketStart = bucket.start(of: Date(timeIntervalSince1970: Double(row.hour)))
+            totals[key, default: [:]][bucketStart, default: .zero] += value(row)
         }
         return totals
     }
+
+    /// The non-zero buckets of one group as wire points, sorted by date.
+    ///
+    private static func sparsePoints<T: AdditiveArithmetic & Equatable>(_ totals: [Date: T], value: (T) -> FieldValue) -> [MetricSeriesPoint] {
+        totals
+            .filter { $0.value != .zero }
+            .sorted { $0.key < $1.key }
+            .map { MetricSeriesPoint(date: Int64(($0.key.timeIntervalSince1970 * 1000).rounded()), value: value($0.value)) }
+    }
+}
+
+/// A (name, category) series identity.
+private struct GroupKey: Hashable {
+    let name: String
+    let category: String?
 }
