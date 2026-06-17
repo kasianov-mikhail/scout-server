@@ -1,4 +1,4 @@
-// swift-tools-version:6.0
+// swift-tools-version:6.3
 import PackageDescription
 
 let package = Package(
@@ -12,9 +12,9 @@ let package = Package(
         .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.8.0"),
         .package(url: "https://github.com/vapor/fluent-sqlite-driver.git", from: "4.6.0"),
         .package(url: "https://github.com/vapor/sql-kit.git", from: "3.28.0"),
-        // swift-system 1.7.x breaks swift-nio's Linux build with CSystem
-        // visibility errors; drop the pin once apple/swift-nio#3622 is fixed.
-        .package(url: "https://github.com/apple/swift-system.git", "1.0.0"..<"1.7.0"),
+        // swift-system 1.7.0 shipped a MemberImportVisibility regression that
+        // broke swift-nio's Linux build; require 1.7.1+ where it's fixed.
+        .package(url: "https://github.com/apple/swift-system.git", from: "1.7.1"),
     ],
     targets: [
         .executableTarget(
