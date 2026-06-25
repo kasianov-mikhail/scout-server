@@ -18,7 +18,7 @@ A Vapor backend for the [Scout](https://github.com/kasianov-mikhail/scout) packa
 | | | |
 |:-:|-|-|
 | 📊 | **Native Aggregation** | The matrix record types Scout's UI reads (`DateIntMatrix`, `DateDoubleMatrix`), the DAU/WAU/MAU active-user series, and flat per-name metric series are synthesized on the fly with SQL — clients upload only raw records. |
-| 🔁 | **Idempotent Upserts** | Records are upserted by `recordName`, so re-sent batches overwrite in place and sync retries stay safe. The [Scout](https://github.com/kasianov-mikhail/scout) dashboard queries the API directly. |
+| 🔁 | **Idempotent Upserts** | Records are upserted by `recordID`, so re-sent batches overwrite in place and sync retries stay safe. The [Scout](https://github.com/kasianov-mikhail/scout) dashboard queries the API directly. |
 | 🔑 | **API Keys** | Endpoints are guarded by API keys, passed via an `X-API-Key` header or a bearer token. |
 | 🐘 | **Postgres** | Records persist in Postgres with migrations run automatically on boot; tests run against in-memory SQLite. |
 | 🐳 | **Docker** | Ships as a container image on the [GitHub Container Registry](https://github.com/kasianov-mikhail/scout-server/pkgs/container/scout-server). |

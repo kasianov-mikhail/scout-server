@@ -12,14 +12,14 @@ All endpoints sit under `/api/v1` and require an API key, passed either as an `X
 
 ## `POST /api/v1/records`
 
-Upserts a batch of records (at most 1000 per request) keyed by `recordName`: re-sent records overwrite their fields, so sync retries stay idempotent. Matrix record types are rejected — they are derived, not stored.
+Upserts a batch of records (at most 1000 per request) keyed by `recordID`: re-sent records overwrite their fields, so sync retries stay idempotent. Matrix record types are rejected — they are derived, not stored.
 
 ```json
 {
   "records": [
     {
       "recordType": "Event",
-      "recordName": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+      "recordID": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
       "fields": {
         "name": {"string": "login"},
         "date": {"date": 1718000000000},

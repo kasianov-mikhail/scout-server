@@ -10,7 +10,7 @@ import Vapor
 /// Wire representation of a single record.
 struct Record: Content, Equatable {
     let recordType: String
-    let recordName: String
+    let recordID: String
     var fields: [String: FieldValue]
 }
 

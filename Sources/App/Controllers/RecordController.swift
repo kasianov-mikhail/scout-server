@@ -19,7 +19,7 @@ struct RecordController: RouteCollection {
         records.get(":recordName", use: lookup)
     }
 
-    /// Upserts a batch of records by `recordName` — re-sent records overwrite
+    /// Upserts a batch of records by `recordID` — re-sent records overwrite
     /// their fields, so sync retries stay idempotent.
     ///
     func write(req: Request) async throws -> WriteResponse {
@@ -32,13 +32,13 @@ struct RecordController: RouteCollection {
             guard MatrixService.matrixTypes.contains(record.recordType) == false else {
                 throw Abort(.badRequest, reason: "Matrix records are aggregated server-side and cannot be written")
             }
-            guard !record.recordType.isEmpty, !record.recordName.isEmpty else {
-                throw Abort(.badRequest, reason: "Records require a recordType and recordName")
+            guard !record.recordType.isEmpty, !record.recordID.isEmpty else {
+                throw Abort(.badRequest, reason: "Records require a recordType and recordID")
             }
         }
 
         try await req.db.transaction { db in
-            let names = body.records.map(\.recordName)
+            let names = body.records.map(\.recordID)
             let existing = try await RecordModel.query(on: db)
                 .filter(\.$recordName ~~ names)
                 .all()
@@ -47,13 +47,13 @@ struct RecordController: RouteCollection {
             var fresh: [String: RecordModel] = [:]
 
             for record in body.records {
-                if let model = byName[record.recordName] {
+                if let model = byName[record.recordID] {
                     model.apply(fields: record.fields)
                     try await model.save(on: db)
-                } else if let model = fresh[record.recordName] {
+                } else if let model = fresh[record.recordID] {
                     model.apply(fields: record.fields)
                 } else {
-                    fresh[record.recordName] = RecordModel(record)
+                    fresh[record.recordID] = RecordModel(record)
                 }
             }
 
