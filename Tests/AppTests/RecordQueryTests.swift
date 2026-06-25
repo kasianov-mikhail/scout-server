@@ -130,7 +130,7 @@ final class RecordQueryTests: XCTestCase {
             }
 
             XCTAssertEqual(collected.count, 7)
-            XCTAssertEqual(Set(collected.map(\.recordName)).count, 7)
+            XCTAssertEqual(Set(collected.map(\.recordID)).count, 7)
         }
     }
 
@@ -157,7 +157,7 @@ final class RecordQueryTests: XCTestCase {
             }
 
             XCTAssertEqual(collected.count, 10)
-            XCTAssertEqual(Set(collected.map(\.recordName)).count, 10)
+            XCTAssertEqual(Set(collected.map(\.recordID)).count, 10)
         }
     }
 

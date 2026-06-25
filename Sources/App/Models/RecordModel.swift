@@ -92,7 +92,7 @@ extension RecordModel {
         self.init()
         id = UUID.v7()
         recordType = record.recordType
-        recordName = record.recordName
+        recordName = record.recordID
         apply(fields: record.fields)
     }
 
@@ -133,7 +133,7 @@ extension RecordModel {
     }
 
     var wire: Record {
-        Record(recordType: recordType, recordName: recordName, fields: payload)
+        Record(recordType: recordType, recordID: recordName, fields: payload)
     }
 }
 

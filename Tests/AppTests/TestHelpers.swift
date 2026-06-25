@@ -55,7 +55,7 @@ func utcDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: I
 }
 
 func makeRecord(type: String, name recordName: String = UUID().uuidString, fields: [String: FieldValue]) -> Record {
-    Record(recordType: type, recordName: recordName, fields: fields)
+    Record(recordType: type, recordID: recordName, fields: fields)
 }
 
 func makeEvent(name: String, date: Date, level: String = "info", sessionID: String = UUID().uuidString, installID: String = UUID().uuidString) -> Record {

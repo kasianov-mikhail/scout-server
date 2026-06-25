@@ -56,7 +56,7 @@ final class UUIDv7Tests: XCTestCase {
             try await write([event], to: app)
 
             let model = try await RecordModel.query(on: app.db)
-                .filter(\.$recordName == event.recordName)
+                .filter(\.$recordName == event.recordID)
                 .first()
             let id = try XCTUnwrap(model?.id)
             XCTAssertEqual(bytes(of: id)[6] >> 4, 0x7)

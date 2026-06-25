@@ -53,7 +53,7 @@ enum MatrixService {
                 throw Abort(.badRequest, reason: "Unknown matrix type '\(recordType)'")
             }
 
-        let sorted = records.sorted { $0.recordName < $1.recordName }
+        let sorted = records.sorted { $0.recordID < $1.recordID }
 
         return QueryResponse(
             records: sorted.map { $0.keeping(fields: request.fields) },
@@ -196,7 +196,7 @@ enum MatrixService {
             }
             return Record(
                 recordType: recordType,
-                recordName: recordName(type: recordType, name: key.name, category: key.category, date: key.week),
+                recordID: recordName(type: recordType, name: key.name, category: key.category, date: key.week),
                 fields: fields
             )
         }
