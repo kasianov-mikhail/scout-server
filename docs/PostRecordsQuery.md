@@ -21,8 +21,8 @@ Queries for `DateIntMatrix` and `DateDoubleMatrix` are answered by aggregation o
 - `DateIntMatrix` — weekly hour-bucket counts of lifecycle records (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`), of events grouped by event name, and hour-bucket sums of `IntMetric` values grouped by metric name and category.
 - `DateDoubleMatrix` — hour-bucket sums of `DoubleMetric` values.
 
-The same aggregation is also available as a name-grouped flat time series — see [`GET /api/v1/metrics/series`](get-metrics-series.md).
+The same aggregation is also available as a name-grouped flat time series — see [`GET /api/v1/metrics/series`](GetMetricsSeries.md).
 
-Active users (DAU/WAU/MAU) are aggregated natively too, but served as a flat series from [`GET /api/v1/metrics/active-users`](get-metrics-active-users.md).
+Active users (DAU/WAU/MAU) are aggregated natively too, but served as a flat series from [`GET /api/v1/metrics/active-users`](GetMetricsActiveUsers.md).
 
 `IntMetric` and `DoubleMetric` are the raw metric record types clients upload (`name`, `category`, `date`, `value` + the usual id metadata); the server aggregates them into the matrix records above.
