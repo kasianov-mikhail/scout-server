@@ -85,8 +85,6 @@ final class RecordModel: Model, @unchecked Sendable {
     init() {}
 }
 
-// MARK: - Wire Mapping
-
 extension RecordModel {
     convenience init(_ record: Record) {
         self.init()
@@ -136,8 +134,6 @@ extension RecordModel {
         Record(recordType: recordType, recordID: recordName, fields: payload)
     }
 }
-
-// MARK: - Migration
 
 struct CreateRecord: AsyncMigration {
     func prepare(on database: any Database) async throws {

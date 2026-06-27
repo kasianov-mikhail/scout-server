@@ -38,8 +38,6 @@ enum ActiveUserService {
         }
     }
 
-    // MARK: - Native series
-
     /// A flat DAU/WAU/MAU series — the aggregation-native shape the server
     /// serves directly. One point per UTC day in
     /// the half-open `[from, to)` range, each an as-of trailing distinct-install
@@ -67,8 +65,6 @@ enum ActiveUserService {
 
         return points
     }
-
-    // MARK: - Forward-Marked Activity
 
     /// For each period, the set of installs counted active on each day. An
     /// install active on day A is marked forward across `[A, A + 1 period)`,
@@ -100,8 +96,6 @@ enum ActiveUserService {
 
         return active
     }
-
-    // MARK: - Activity Pairs
 
     private struct ActivityPair: Decodable {
         let install: String

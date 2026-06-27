@@ -62,8 +62,6 @@ enum MetricSeriesService {
         constraints.name = name
         constraints.category = category
 
-        // The hourly buckets over-fetch a week past `to` for grid alignment,
-        // so drop anything at or after the range's upper bound here.
         let upper = Int64(to.timeIntervalSince1970)
 
         var intTotals: [GroupKey: [Date: Int64]] = [:]
@@ -88,8 +86,6 @@ enum MetricSeriesService {
         }
 
         for (key, totals) in doubleTotals {
-            // Inferred flavor: a name carried by the integer side wins, so skip
-            // its double counterpart rather than emit a duplicate group.
             if values == nil, intTotals[key] != nil {
                 continue
             }

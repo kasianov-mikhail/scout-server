@@ -22,10 +22,6 @@ func withApp(_ body: (Application) async throws -> Void) async throws {
     do {
         try await configure(app)
         app.apiKeys = APIKeys(keys: [testAPIKey], environment: .testing)
-        // Revert first so each test starts from a clean schema. A fresh
-        // in-memory SQLite makes this a no-op, but a Postgres run shares one
-        // database across tests, so the previous test's tables and rows must be
-        // dropped to keep cases isolated.
         try await app.autoRevert()
         try await app.autoMigrate()
         try await body(app)
@@ -44,8 +40,6 @@ extension HTTPHeaders {
         return headers
     }
 }
-
-// MARK: - Record Factories
 
 func utcDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0) -> Date {
     DateComponents(
@@ -116,8 +110,6 @@ func makeMetric(type: String = "IntMetric", name: String, category: String, date
         ]
     )
 }
-
-// MARK: - Requests
 
 func write(_ records: [Record], to app: Application) async throws {
     try await app.test(

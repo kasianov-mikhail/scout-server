@@ -34,21 +34,17 @@ final class ActiveUserSeriesTests: XCTestCase {
 
             let series = try await activeUsers(from: utcDate(2026, 6, 1), to: utcDate(2026, 7, 1), on: app)
 
-            // Dense: one point per UTC day in June.
             XCTAssertEqual(series.count, 30)
 
-            // DAU: both installs on the 10th, only "a" on the 11th.
             XCTAssertEqual(point(series, utcDate(2026, 6, 10))?.dau, 2)
             XCTAssertEqual(point(series, utcDate(2026, 6, 11))?.dau, 1)
             XCTAssertEqual(point(series, utcDate(2026, 6, 12))?.dau, 0)
 
-            // WAU: 7-day trailing window; "a" extends one extra day via the 11th.
             XCTAssertEqual(point(series, utcDate(2026, 6, 10))?.wau, 2)
             XCTAssertEqual(point(series, utcDate(2026, 6, 16))?.wau, 2)
             XCTAssertEqual(point(series, utcDate(2026, 6, 17))?.wau, 1)
             XCTAssertEqual(point(series, utcDate(2026, 6, 18))?.wau, 0)
 
-            // MAU: trailing calendar month, both installs through month end.
             XCTAssertEqual(point(series, utcDate(2026, 6, 10))?.mau, 2)
             XCTAssertEqual(point(series, utcDate(2026, 6, 30))?.mau, 2)
         }
@@ -56,8 +52,6 @@ final class ActiveUserSeriesTests: XCTestCase {
 
     func testActivityFromPreviousMonthReachesIntoRange() async throws {
         try await withApp { app in
-            // Active on May 25: monthly-active through June 24, weekly-active
-            // only into late May.
             try await write(
                 [makeSession(start: utcDate(2026, 5, 25, 12), installID: "a")],
                 to: app

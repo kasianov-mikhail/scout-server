@@ -136,10 +136,6 @@ final class RecordQueryTests: XCTestCase {
 
     func testCursorIsStableWhenSortKeysTie() async throws {
         try await withApp { app in
-            // Every record shares one timestamp, so the sorted field is fully
-            // tied and only the id tiebreak in `RecordQueryService` gives a
-            // total order. Without it, offset pages drawn by separate queries
-            // could reorder the ties and skip or repeat rows.
             let sameInstant = utcDate(2026, 6, 10, 9)
             let events = (0..<10).map { _ in makeEvent(name: "tick", date: sameInstant) }
             try await write(events, to: app)
