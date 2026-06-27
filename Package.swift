@@ -4,7 +4,11 @@ import PackageDescription
 let package = Package(
     name: "scout-server",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v14),
+        // The server only runs on macOS/Linux, but it shares an Xcode workspace
+        // with the iOS client. Declare an iOS floor matching Vapor/Fluent's
+        // minimum so Xcode doesn't try to build it for iOS 12.0 and fail.
+        .iOS(.v13),
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.99.0"),
