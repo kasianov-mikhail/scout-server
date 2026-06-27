@@ -78,12 +78,6 @@ final class RecordWriteTests: XCTestCase {
 
     func testRecordNameIsGlobalIdentityAcrossTypes() async throws {
         try await withApp { app in
-            // The unique constraint is on `record_name` alone: reusing a
-            // name under a different type updates the existing record in
-            // place — it keeps its original type and takes the new fields —
-            // rather than creating a second row. This pins that intent so the
-            // global scope stays a deliberate choice, not something a later
-            // change can quietly undo.
             let name = "shared-id"
             try await write([makeRecord(type: "Alpha", name: name, fields: ["level": .string("info")])], to: app)
             try await write([makeRecord(type: "Beta", name: name, fields: ["level": .string("warn")])], to: app)
@@ -95,7 +89,6 @@ final class RecordWriteTests: XCTestCase {
                 XCTAssertEqual(fetched.fields["level"], .string("warn"))
             }
 
-            // The second write did not spawn a row under the new type.
             let beta = try await query(QueryRequest(recordType: "Beta"), on: app)
             XCTAssertTrue(beta.records.isEmpty)
         }
@@ -107,8 +100,6 @@ final class RecordWriteTests: XCTestCase {
             var session = makeSession(start: start, installID: "install-1", sessionID: "session-1")
             try await write([session], to: app)
 
-            // The client re-sends sessions until synced; the second write
-            // carries the end date and must replace the stored fields.
             session.fields["end_date"] = .date(utcDate(2026, 6, 10, 10))
             try await write([session], to: app)
 

@@ -25,18 +25,16 @@ extension UUID {
     static func v7(now: Date = Date()) -> UUID {
         var bytes = [UInt8](repeating: 0, count: 16)
 
-        // Bytes 0–5: milliseconds since the Unix epoch, big-endian.
         let milliseconds = UInt64(now.timeIntervalSince1970 * 1000)
         for offset in 0..<6 {
             bytes[offset] = UInt8(truncatingIfNeeded: milliseconds >> (8 * (5 - offset)))
         }
 
-        // Bytes 6–15: random, then stamp the version and variant bits.
         for offset in 6..<16 {
             bytes[offset] = UInt8.random(in: .min ... .max)
         }
-        bytes[6] = (bytes[6] & 0x0F) | 0x70  // version 7 in the high nibble
-        bytes[8] = (bytes[8] & 0x3F) | 0x80  // variant 0b10 in the high bits
+        bytes[6] = (bytes[6] & 0x0F) | 0x70
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
 
         return UUID(uuid: (
             bytes[0], bytes[1], bytes[2], bytes[3],

@@ -61,8 +61,6 @@ enum MatrixService {
         )
     }
 
-    // MARK: - DateIntMatrix / DateDoubleMatrix
-
     private static func intMatrices(_ constraints: MatrixConstraints, on database: any Database) async throws -> [Record] {
         let buckets = try await intBuckets(constraints, on: database)
         return assemble(buckets, recordType: intMatrixType, constraints: constraints) { .int($0.totalInt ?? 0) }
@@ -180,9 +178,6 @@ enum MatrixService {
             let key = MatrixKey(name: name, category: bucket.category, week: week)
             let cell = "cell_\(weekday)_\(String(format: "%02d", hour))"
 
-            // An event sharing a lifecycle type's name lands in the same
-            // bucket, so summing their counts here keeps both contributions
-            // in the observable result.
             matrices[key, default: [:]][cell] = adding(matrices[key]?[cell], value(bucket))
         }
 
@@ -224,8 +219,6 @@ enum MatrixService {
         return sql
     }
 }
-
-// MARK: - Building Blocks
 
 /// One GROUP BY row: a (name, category, hour bucket) and its aggregate.
 struct MatrixBucket: Decodable {

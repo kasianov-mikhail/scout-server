@@ -59,7 +59,6 @@ final class MetricSeriesTests: XCTestCase {
                 name: "login", from: utcDate(2026, 6, 9), to: utcDate(2026, 6, 12), on: app
             )
 
-            // Sparse: only the one non-empty day carries a point.
             XCTAssertEqual(points(groups, "login").count, 1)
             XCTAssertEqual(value(groups, "login", utcDate(2026, 6, 10)), .int(1))
             XCTAssertNil(value(groups, "login", utcDate(2026, 6, 9)))
@@ -180,8 +179,6 @@ final class MetricSeriesTests: XCTestCase {
                 to: app
             )
 
-            // No name: the whole category comes back, one group per name, with
-            // other categories excluded.
             let groups = try await metricSeries(
                 category: "counter", values: "int",
                 from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app

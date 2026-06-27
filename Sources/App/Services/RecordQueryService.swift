@@ -49,8 +49,6 @@ enum RecordQueryService {
             builder.sort(field(sort.field), sort.ascending ? .ascending : .descending)
         }
 
-        // A deterministic tiebreak so offset pagination never skips or
-        // repeats rows between pages.
         builder.sort(\.$id)
 
         let models = try await builder.range(cursor.offset..<(cursor.offset + limit + 1)).all()
