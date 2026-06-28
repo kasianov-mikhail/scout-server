@@ -52,6 +52,12 @@ final class RecordModel: Model, @unchecked Sendable {
     @OptionalField(key: "session_id")
     var sessionID: String?
 
+    @OptionalField(key: "app_version")
+    var appVersion: String?
+
+    @OptionalField(key: "build_number")
+    var buildNumber: String?
+
     @OptionalField(key: "date")
     var date: Date?
 
@@ -106,6 +112,8 @@ extension RecordModel {
         installID = fields["install_id"]?.stringValue
         launchID = fields["launch_id"]?.stringValue
         sessionID = fields["session_id"]?.stringValue
+        appVersion = fields["app_version"]?.stringValue
+        buildNumber = fields["build_number"]?.stringValue
         date = fields["date"]?.dateValue
         startDate = fields["start_date"]?.dateValue
         endDate = fields["end_date"]?.dateValue
@@ -165,5 +173,21 @@ struct CreateRecord: AsyncMigration {
 
     func revert(on database: any Database) async throws {
         try await database.schema(RecordModel.schema).delete()
+    }
+}
+
+struct AddVersionFields: AsyncMigration {
+    func prepare(on database: any Database) async throws {
+        try await database.schema(RecordModel.schema)
+            .field("app_version", .string)
+            .field("build_number", .string)
+            .update()
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.schema(RecordModel.schema)
+            .deleteField("app_version")
+            .deleteField("build_number")
+            .update()
     }
 }
