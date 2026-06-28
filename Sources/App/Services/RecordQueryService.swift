@@ -18,6 +18,7 @@ enum RecordQueryService {
         "name", "category", "level", "uuid",
         "device_id", "install_id", "launch_id", "session_id",
         "date", "start_date", "end_date", "param_count",
+        "app_version", "build_number",
     ]
 
     static func run(_ request: QueryRequest, on database: any Database) async throws -> QueryResponse {
