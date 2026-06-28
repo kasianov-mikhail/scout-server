@@ -29,6 +29,9 @@ let package = Package(
                 .product(name: "FluentPostgresDriver", package: "fluent-postgres-driver"),
                 .product(name: "FluentSQLiteDriver", package: "fluent-sqlite-driver"),
                 .product(name: "SQLKit", package: "sql-kit"),
+                // Not used directly; referenced so the version pin in the
+                // package dependencies above counts as "used by a target".
+                .product(name: "SystemPackage", package: "swift-system"),
             ],
             swiftSettings: swiftSettings
         ),
