@@ -108,11 +108,11 @@ enum MatrixService {
         if let named {
             rows = try await sql.raw(
                 """
-                SELECT hour_epoch AS hour, COUNT(*) AS total_int
+                SELECT app_version, hour_epoch AS hour, COUNT(*) AS total_int
                 FROM records
                 WHERE record_type = \(bind: recordType)
                   AND hour_epoch >= \(bind: range.lowerBound) AND hour_epoch < \(bind: range.upperBound)
-                GROUP BY hour_epoch
+                GROUP BY app_version, hour_epoch
                 """
             ).all(decoding: MatrixBucket.self).map { bucket in
                 var bucket = bucket
@@ -122,11 +122,11 @@ enum MatrixService {
         } else {
             rows = try await sql.raw(
                 """
-                SELECT name, hour_epoch AS hour, COUNT(*) AS total_int
+                SELECT name, app_version, hour_epoch AS hour, COUNT(*) AS total_int
                 FROM records
                 WHERE record_type = \(bind: recordType) AND name IS NOT NULL
                   AND hour_epoch >= \(bind: range.lowerBound) AND hour_epoch < \(bind: range.upperBound)
-                GROUP BY name, hour_epoch
+                GROUP BY name, app_version, hour_epoch
                 """
             ).all(decoding: MatrixBucket.self)
         }
@@ -175,7 +175,7 @@ enum MatrixService {
 
             let weekday = Calendar.utc.component(.weekday, from: hourDate)
             let hour = Calendar.utc.component(.hour, from: hourDate)
-            let key = MatrixKey(name: name, category: bucket.category, week: week)
+            let key = MatrixKey(name: name, category: bucket.category, appVersion: bucket.appVersion, week: week)
             let cell = "cell_\(weekday)_\(String(format: "%02d", hour))"
 
             matrices[key, default: [:]][cell] = adding(matrices[key]?[cell], value(bucket))
@@ -189,9 +189,12 @@ enum MatrixService {
             if let category = key.category {
                 fields["category"] = .string(category)
             }
+            if let appVersion = key.appVersion {
+                fields["app_version"] = .string(appVersion)
+            }
             return Record(
                 recordType: recordType,
-                recordID: recordName(type: recordType, name: key.name, category: key.category, date: key.week),
+                recordID: recordName(type: recordType, name: key.name, category: key.category, appVersion: key.appVersion, date: key.week),
                 fields: fields
             )
         }
@@ -208,8 +211,8 @@ enum MatrixService {
         }
     }
 
-    static func recordName(type: String, name: String, category: String?, date: Date) -> String {
-        "\(type)/\(name)/\(category ?? "-")/\(Int64(date.timeIntervalSince1970))"
+    static func recordName(type: String, name: String, category: String?, appVersion: String?, date: Date) -> String {
+        "\(type)/\(name)/\(category ?? "-")/\(appVersion ?? "-")/\(Int64(date.timeIntervalSince1970))"
     }
 
     static func sqlDatabase(_ database: any Database) throws -> any SQLDatabase {
@@ -224,12 +227,14 @@ enum MatrixService {
 struct MatrixBucket: Decodable {
     var name: String?
     var category: String?
+    var appVersion: String?
     var hour: Int64
     var totalInt: Int64?
     var totalDouble: Double?
 
     enum CodingKeys: String, CodingKey {
         case name, category, hour
+        case appVersion = "app_version"
         case totalInt = "total_int"
         case totalDouble = "total_double"
     }
@@ -238,6 +243,7 @@ struct MatrixBucket: Decodable {
 private struct MatrixKey: Hashable {
     let name: String
     let category: String?
+    let appVersion: String?
     let week: Date
 }
 
@@ -248,6 +254,7 @@ struct MatrixConstraints {
     var dateRange: Range<Date> = Date.distantPast..<Date.distantFuture
     var name: String?
     var category: String?
+    var appVersion: String?
 
     init(dateRange: Range<Date>) {
         self.dateRange = dateRange
@@ -267,6 +274,8 @@ struct MatrixConstraints {
                 name = value
             case ("category", .equals, .string(let value)):
                 category = value
+            case ("app_version", .equals, .string(let value)):
+                appVersion = value
             default:
                 throw Abort(.badRequest, reason: "Unsupported matrix filter on '\(filter.field)'")
             }
@@ -294,6 +303,9 @@ struct MatrixConstraints {
             return false
         }
         if let category, bucket.category != category {
+            return false
+        }
+        if let appVersion, bucket.appVersion != appVersion {
             return false
         }
         return true
