@@ -177,9 +177,13 @@ struct CreateRecord: AsyncMigration {
 }
 
 struct AddVersionFields: AsyncMigration {
+    // SQLite can't add two columns in one ALTER TABLE, so each field gets
+    // its own update.
     func prepare(on database: any Database) async throws {
         try await database.schema(RecordModel.schema)
             .field("app_version", .string)
+            .update()
+        try await database.schema(RecordModel.schema)
             .field("build_number", .string)
             .update()
     }

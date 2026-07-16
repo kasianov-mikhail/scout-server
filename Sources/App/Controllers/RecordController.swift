@@ -29,9 +29,6 @@ struct RecordController: RouteCollection {
             throw Abort(.payloadTooLarge, reason: "At most \(Self.maxBatchSize) records per request")
         }
         for record in body.records {
-            guard MatrixService.matrixTypes.contains(record.recordType) == false else {
-                throw Abort(.badRequest, reason: "Matrix records are aggregated server-side and cannot be written")
-            }
             guard !record.recordType.isEmpty, !record.recordID.isEmpty else {
                 throw Abort(.badRequest, reason: "Records require a recordType and recordID")
             }
@@ -65,11 +62,6 @@ struct RecordController: RouteCollection {
 
     func query(req: Request) async throws -> QueryResponse {
         let query = try req.content.decode(QueryRequest.self)
-
-        if let recordType = query.recordType, MatrixService.matrixTypes.contains(recordType) {
-            return try await MatrixService.run(query, on: req.db)
-        }
-
         return try await RecordQueryService.run(query, on: req.db)
     }
 

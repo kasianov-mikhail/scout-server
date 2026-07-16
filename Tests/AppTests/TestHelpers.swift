@@ -74,23 +74,50 @@ func makeEvent(name: String, date: Date, level: String = "info", sessionID: Stri
     )
 }
 
-func makeSession(start: Date, installID: String, sessionID: String = UUID().uuidString) -> Record {
-    makeRecord(
-        type: "Session",
-        name: sessionID,
-        fields: [
-            "start_date": .date(start),
-            "session_id": .string(sessionID),
-            "install_id": .string(installID),
-            "device_id": .string(installID),
-            "launch_id": .string(UUID().uuidString),
-            "hour": .date(start.startOfHour),
-            "day": .date(start.startOfDay),
-            "week": .date(start.startOfWeek),
-            "month": .date(start.startOfMonth),
-            "version": .int(1),
-        ]
-    )
+func makeSession(start: Date, installID: String, sessionID: String = UUID().uuidString, appVersion: String? = nil) -> Record {
+    var fields: [String: FieldValue] = [
+        "start_date": .date(start),
+        "session_id": .string(sessionID),
+        "install_id": .string(installID),
+        "device_id": .string(installID),
+        "launch_id": .string(UUID().uuidString),
+        "hour": .date(start.startOfHour),
+        "day": .date(start.startOfDay),
+        "week": .date(start.startOfWeek),
+        "month": .date(start.startOfMonth),
+        "version": .int(1),
+    ]
+    if let appVersion {
+        fields["app_version"] = .string(appVersion)
+    }
+    return makeRecord(type: "Session", name: sessionID, fields: fields)
+}
+
+func makeIncident(type: String, date: Date, installID: String? = nil, appVersion: String? = nil) -> Record {
+    var fields: [String: FieldValue] = [
+        "date": .date(date),
+        "hour": .date(date.startOfHour),
+        "day": .date(date.startOfDay),
+        "week": .date(date.startOfWeek),
+        "month": .date(date.startOfMonth),
+        "uuid": .string(UUID().uuidString),
+        "version": .int(1),
+    ]
+    if let installID {
+        fields["install_id"] = .string(installID)
+    }
+    if let appVersion {
+        fields["app_version"] = .string(appVersion)
+    }
+    return makeRecord(type: type, fields: fields)
+}
+
+func makeCrash(date: Date, installID: String? = nil, appVersion: String? = nil) -> Record {
+    makeIncident(type: "Crash", date: date, installID: installID, appVersion: appVersion)
+}
+
+func makeHang(date: Date, installID: String? = nil, appVersion: String? = nil) -> Record {
+    makeIncident(type: "Hang", date: date, installID: installID, appVersion: appVersion)
 }
 
 func makeInstall(date: Date, installID: String) -> Record {
@@ -187,7 +214,7 @@ func retention(from: Date, to: Date, on app: Application) async throws -> [Reten
     return response!.cohorts
 }
 
-func metricSeries(name: String? = nil, category: String? = nil, values: String? = nil, bucket: String? = nil, from: Date, to: Date, on app: Application) async throws -> [MetricSeriesGroup] {
+func metricSeries(name: String? = nil, category: String? = nil, values: String? = nil, bucket: String? = nil, by: String? = nil, from: Date, to: Date, on app: Application) async throws -> [MetricSeriesGroup] {
     let fromMs = Int64((from.timeIntervalSince1970 * 1000).rounded())
     let toMs = Int64((to.timeIntervalSince1970 * 1000).rounded())
     var path = "api/v1/metrics/series?from=\(fromMs)&to=\(toMs)"
@@ -195,6 +222,7 @@ func metricSeries(name: String? = nil, category: String? = nil, values: String? 
     if let category { path += "&category=\(category)" }
     if let values { path += "&values=\(values)" }
     if let bucket { path += "&bucket=\(bucket)" }
+    if let by { path += "&by=\(by)" }
 
     var response: MetricSeriesResponse?
     try await app.test(

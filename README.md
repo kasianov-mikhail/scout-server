@@ -3,7 +3,7 @@
 [![CI](https://github.com/kasianov-mikhail/scout-server/actions/workflows/ci.yml/badge.svg)](https://github.com/kasianov-mikhail/scout-server/actions/workflows/ci.yml) [![Docker](https://github.com/kasianov-mikhail/scout-server/actions/workflows/docker.yml/badge.svg)](https://github.com/kasianov-mikhail/scout-server/actions/workflows/docker.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![Swift](https://img.shields.io/badge/Swift-6.0-orange)
 
 
-A Vapor backend for the [Scout](https://github.com/kasianov-mikhail/scout) package. The server aggregates analytics data natively: clients upload only raw records, and the matrix record types Scout's UI reads (`DateIntMatrix`, `DateDoubleMatrix`) are synthesized on the fly with SQL aggregation. Active users (DAU/WAU/MAU) are aggregated the same way and served as a flat series.
+A Vapor backend for the [Scout](https://github.com/kasianov-mikhail/scout) package. The server aggregates analytics data natively: clients upload only raw records, and the name-grouped metric series Scout's UI reads are synthesized on the fly with SQL aggregation. Active users (DAU/WAU/MAU) are aggregated the same way and served as a flat series.
 
 ## Table of Contents
 - [Features](#features)
@@ -17,7 +17,7 @@ A Vapor backend for the [Scout](https://github.com/kasianov-mikhail/scout) packa
 
 | | | |
 |:-:|-|-|
-| 📊 | **Native Aggregation** | The matrix record types Scout's UI reads (`DateIntMatrix`, `DateDoubleMatrix`), the DAU/WAU/MAU active-user series, and flat per-name metric series are synthesized on the fly with SQL — clients upload only raw records. |
+| 📊 | **Native Aggregation** | The name-grouped metric series Scout's UI reads, the DAU/WAU/MAU active-user series, and the retention cohorts are synthesized on the fly with SQL — clients upload only raw records. |
 | 🔁 | **Idempotent Upserts** | Records are upserted by `recordID`, so re-sent batches overwrite in place and sync retries stay safe. The [Scout](https://github.com/kasianov-mikhail/scout) dashboard queries the API directly. |
 | 🔑 | **API Keys** | Endpoints are guarded by API keys, passed via an `X-API-Key` header or a bearer token. |
 | 🐘 | **Postgres** | Records persist in Postgres with migrations run automatically on boot; tests run against in-memory SQLite. |
