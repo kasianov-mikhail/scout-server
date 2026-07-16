@@ -9,8 +9,7 @@ import XCTVapor
 
 @testable import App
 
-/// `GET /metrics/series` flattens the same raw records that feed the
-/// `DateIntMatrix` / `DateDoubleMatrix` grid onto a single time axis, grouped
+/// `GET /metrics/series` folds raw records onto a single time axis, grouped
 /// by name: one sparse point per non-empty bucket, counts as `.int` and metric
 /// sums as `.double`. 2026-06-10 is a Wednesday; its week starts Sunday
 /// 2026-06-07.
@@ -190,10 +189,113 @@ final class MetricSeriesTests: XCTestCase {
         }
     }
 
-    func testMissingNameAndCategoryIsRejected() async throws {
+    func testSweepWithoutFiltersSpansAllSources() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeEvent(name: "login", date: utcDate(2026, 6, 10, 9)),
+                    makeSession(start: utcDate(2026, 6, 10, 9), installID: "a"),
+                    makeCrash(date: utcDate(2026, 6, 10, 10), installID: "a", appVersion: "1.0"),
+                    makeHang(date: utcDate(2026, 6, 10, 11)),
+                    makeMetric(name: "requests", category: "counter", date: utcDate(2026, 6, 10, 9), value: .int(5)),
+                    makeMetric(type: "DoubleMetric", name: "duration", category: "timer", date: utcDate(2026, 6, 10, 9), value: .double(0.5)),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app)
+
+            let names = Set(groups.map(\.name))
+            XCTAssertTrue(names.isSuperset(of: ["login", "Session", "Crash", "Hang", "VersionCrash", "requests", "duration"]), "\(names)")
+            XCTAssertEqual(value(groups, "login", utcDate(2026, 6, 10)), .int(1))
+            XCTAssertEqual(value(groups, "duration", utcDate(2026, 6, 10)), .double(0.5))
+        }
+    }
+
+    func testHangCountsByType() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeHang(date: utcDate(2026, 6, 10, 9)),
+                    makeHang(date: utcDate(2026, 6, 10, 14)),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "Hang", from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            XCTAssertEqual(value(groups, "Hang", utcDate(2026, 6, 10)), .int(2))
+        }
+    }
+
+    func testVersionGroupingSplitsLifecycleCounts() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeSession(start: utcDate(2026, 6, 10, 9), installID: "a", appVersion: "3.2.0"),
+                    makeSession(start: utcDate(2026, 6, 10, 9, 30), installID: "a", appVersion: "3.2.0"),
+                    makeSession(start: utcDate(2026, 6, 10, 9), installID: "b", appVersion: "3.1.4"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "Session", by: "version",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            XCTAssertEqual(groups.map(\.version), ["3.1.4", "3.2.0"])
+            XCTAssertEqual(groups.map { $0.points.first?.value }, [.int(1), .int(2)])
+        }
+    }
+
+    func testUnversionedQueryKeepsTotalsAcrossVersions() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeSession(start: utcDate(2026, 6, 10, 9), installID: "a", appVersion: "3.2.0"),
+                    makeSession(start: utcDate(2026, 6, 10, 9, 30), installID: "b", appVersion: "3.1.4"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "Session", from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            XCTAssertEqual(groups.map(\.version), [nil])
+            XCTAssertEqual(value(groups, "Session", utcDate(2026, 6, 10)), .int(2))
+        }
+    }
+
+    func testVersionCrashCountsFirstCrashPerInstall() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeCrash(date: utcDate(2026, 6, 10, 9), installID: "a", appVersion: "3.2.0"),
+                    makeCrash(date: utcDate(2026, 6, 10, 15), installID: "a", appVersion: "3.2.0"),
+                    makeCrash(date: utcDate(2026, 6, 10, 9), installID: "b", appVersion: "3.2.0"),
+                    makeCrash(date: utcDate(2026, 6, 10, 9), installID: "a", appVersion: "3.1.4"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "VersionCrash", by: "version",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            XCTAssertEqual(groups.map(\.version), ["3.1.4", "3.2.0"])
+            XCTAssertEqual(groups.map { $0.points.reduce(0) { $0 + ($1.value.intValue ?? 0) } }, [1, 2])
+        }
+    }
+
+    func testUnknownByIsRejected() async throws {
         try await withApp { app in
             try await app.test(
-                .GET, "api/v1/metrics/series?from=0&to=1",
+                .GET, "api/v1/metrics/series?name=login&by=device&from=0&to=1",
                 headers: .authorized,
                 afterResponse: { res async in
                     XCTAssertEqual(res.status, .badRequest)

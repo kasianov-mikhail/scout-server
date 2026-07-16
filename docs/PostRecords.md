@@ -1,6 +1,6 @@
 # `POST /api/v1/records`
 
-Upserts a batch of records (at most 1000 per request) keyed by `recordID`: re-sent records overwrite their fields, so sync retries stay idempotent. Matrix record types are rejected — they are derived, not stored.
+Upserts a batch of records (at most 1000 per request) keyed by `recordID`: re-sent records overwrite their fields, so sync retries stay idempotent.
 
 ```json
 {

@@ -57,21 +57,17 @@ struct MetricsController: RouteCollection {
         return RetentionResponse(cohorts: cohorts)
     }
 
-    /// `GET /metrics/series?name=<name>&category=<cat>&values=int|double&bucket=hour|day|week&from=<ms>&to=<ms>`
+    /// `GET /metrics/series?name=<name>&category=<cat>&values=int|double&bucket=hour|day|week&by=version&from=<ms>&to=<ms>`
     /// — a name-grouped, value-per-bucket series for metric, event, or
-    /// lifecycle names, the time-axis counterpart of the matrix grid. `name`
-    /// and `category` are optional filters but at least one is required;
-    /// `values` picks the flavor (inferred when omitted), `bucket` defaults to
-    /// `day`, and the range defaults to the trailing 90 days, like
-    /// `activeUsers`.
+    /// lifecycle names. `name` and `category` are optional filters; omitting
+    /// both returns every series the raw records carry. `values` picks the
+    /// flavor (inferred when omitted), `bucket` defaults to `day`,
+    /// `by=version` splits the groups by app version, and the range defaults
+    /// to the trailing 90 days, like `activeUsers`.
     ///
     func series(req: Request) async throws -> MetricSeriesResponse {
         let name = req.query[String.self, at: "name"].flatMap { $0.isEmpty ? nil : $0 }
         let category = req.query[String.self, at: "category"].flatMap { $0.isEmpty ? nil : $0 }
-
-        guard name != nil || category != nil else {
-            throw Abort(.badRequest, reason: "Query parameter 'name' or 'category' is required")
-        }
 
         let values = req.query[String.self, at: "values"].flatMap { $0.isEmpty ? nil : $0 }
         if let values, values != "int", values != "double" {
@@ -83,6 +79,11 @@ struct MetricsController: RouteCollection {
             throw Abort(.badRequest, reason: "Unknown bucket '\(bucketName)'; expected hour, day, or week")
         }
 
+        let by = req.query[String.self, at: "by"].flatMap { $0.isEmpty ? nil : $0 }
+        if let by, by != "version" {
+            throw Abort(.badRequest, reason: "Unknown grouping '\(by)'; expected version")
+        }
+
         let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
         let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
 
@@ -90,7 +91,7 @@ struct MetricsController: RouteCollection {
             throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
         }
 
-        let series = try await MetricSeriesService.series(name: name, category: category, values: values, bucket: bucket, from: from, to: to, on: req.db)
+        let series = try await MetricSeriesService.series(name: name, category: category, values: values, bucket: bucket, byVersion: by == "version", from: from, to: to, on: req.db)
         return MetricSeriesResponse(series: series)
     }
 

@@ -45,8 +45,7 @@ enum ActiveUserService {
     /// the result is a dense, directly chartable series.
     ///
     static func series(from: Date, to: Date, on database: any Database) async throws -> [ActiveUserPoint] {
-        let constraints = MatrixConstraints(dateRange: from..<to)
-        let active = try await activeInstalls(constraints, on: database)
+        let active = try await activeInstalls(in: from..<to, on: database)
 
         var points: [ActiveUserPoint] = []
         var day = from.startOfDay
@@ -72,8 +71,8 @@ enum ActiveUserService {
     /// window ending that day. Days at or after the range's upper bound are
     /// skipped, matching the half-open query semantics.
     ///
-    private static func activeInstalls(_ constraints: MatrixConstraints, on database: any Database) async throws -> [Period: [Date: Set<String>]] {
-        let pairs = try await activity(constraints, on: database)
+    private static func activeInstalls(in range: Range<Date>, on database: any Database) async throws -> [Period: [Date: Set<String>]] {
+        let pairs = try await activity(in: range, on: database)
 
         var active: [Period: [Date: Set<String>]] = [:]
         let calendar = Calendar.utc
@@ -86,7 +85,7 @@ enum ActiveUserService {
                 var marked = day
 
                 while marked < limit {
-                    if constraints.dateRange.upperBound > marked {
+                    if range.upperBound > marked {
                         active[period, default: [:]][marked, default: []].insert(pair.install)
                     }
                     marked = calendar.date(byAdding: .day, value: 1, to: marked)!
@@ -105,17 +104,11 @@ enum ActiveUserService {
     /// Distinct (install, day) activity pairs. The lower bound backs off
     /// far enough that a month-long forward mark still reaches the range.
     ///
-    private static func activity(_ constraints: MatrixConstraints, on database: any Database) async throws -> [ActivityPair] {
-        let sql = try MatrixService.sqlDatabase(database)
+    private static func activity(in range: Range<Date>, on database: any Database) async throws -> [ActivityPair] {
+        let sql = try database.sql()
 
-        let lower =
-            constraints.dateRange.lowerBound == .distantPast
-            ? Int64.min / 2
-            : Int64(constraints.dateRange.lowerBound.timeIntervalSince1970) - 32 * 86_400
-        let upper =
-            constraints.dateRange.upperBound == .distantFuture
-            ? Int64.max / 2
-            : Int64(constraints.dateRange.upperBound.timeIntervalSince1970)
+        let lower = Int64(range.lowerBound.timeIntervalSince1970) - 32 * 86_400
+        let upper = Int64(range.upperBound.timeIntervalSince1970)
 
         return try await sql.raw(
             """

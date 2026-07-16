@@ -10,8 +10,8 @@ import Foundation
 extension Calendar {
     /// The calendar Scout uses for every date bucket, byte-for-byte the
     /// client's `Calendar.utc`: ISO 8601 rules, `firstWeekday = 1`, UTC.
-    /// Matrix cell keys depend on its `weekday` numbering (1 = Sunday),
-    /// so the server must not deviate from the client here.
+    /// Week buckets depend on its `firstWeekday` (1 = Sunday), so the
+    /// server must not deviate from the client here.
     ///
     static var utc: Calendar {
         var calendar = Calendar(identifier: .iso8601)

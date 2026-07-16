@@ -7,8 +7,7 @@
 
 import Vapor
 
-/// A name-grouped, value-per-bucket series — the time-axis counterpart of the
-/// `DateIntMatrix` / `DateDoubleMatrix` grid, aggregated natively from raw
+/// A name-grouped, value-per-bucket series, aggregated natively from raw
 /// records. One `MetricSeriesGroup` per metric, event, or lifecycle name, so a
 /// single request can carry a whole telemetry category.
 ///
@@ -16,11 +15,13 @@ struct MetricSeriesResponse: Content, Equatable {
     let series: [MetricSeriesGroup]
 }
 
-/// One name's series over the requested range.
+/// One name's series over the requested range. `version` is set only when
+/// the request asked to split groups `by=version`.
 ///
 struct MetricSeriesGroup: Content, Equatable {
     let name: String
     let category: String?
+    let version: String?
     let points: [MetricSeriesPoint]
 }
 

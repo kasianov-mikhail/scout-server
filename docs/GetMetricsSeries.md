@@ -1,6 +1,6 @@
 # `GET /api/v1/metrics/series`
 
-A name-grouped, pre-aggregated value-per-bucket series — the time-axis counterpart of the `DateIntMatrix` / `DateDoubleMatrix` grid. The same raw records feed both: record counts for lifecycle types (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`) and event names, value sums for `IntMetric` / `DoubleMetric` names. One group per name, so a single request can carry a whole telemetry category.
+A name-grouped, pre-aggregated value-per-bucket series: record counts for lifecycle types (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`, `Hang`) and event names, value sums for `IntMetric` / `DoubleMetric` names, and first-crash-per-install counts under the `VersionCrash` pseudo-name. One group per name, so a single request can carry a whole telemetry category — or, with no filters at all, the entire record stream.
 
 | Parameter | Meaning |
 | --- | --- |

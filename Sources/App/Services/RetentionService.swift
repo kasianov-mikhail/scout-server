@@ -105,7 +105,7 @@ enum RetentionService {
     /// acquired install, not just the returning ones.
     ///
     private static func activity(from: Date, to: Date, on database: any Database) async throws -> [RetentionRow] {
-        let sql = try MatrixService.sqlDatabase(database)
+        let sql = try database.sql()
 
         let lower = Int64(from.timeIntervalSince1970)
         let upper = Int64(to.timeIntervalSince1970)

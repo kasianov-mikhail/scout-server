@@ -123,23 +123,6 @@ final class RecordWriteTests: XCTestCase {
         }
     }
 
-    func testRejectsMatrixWrites() async throws {
-        try await withApp { app in
-            let matrix = makeRecord(type: "DateIntMatrix", fields: ["name": .string("Session")])
-
-            try await app.test(
-                .POST, "api/v1/records",
-                headers: .authorized,
-                beforeRequest: { req in
-                    try req.content.encode(WriteRequest(records: [matrix]))
-                },
-                afterResponse: { res async in
-                    XCTAssertEqual(res.status, .badRequest)
-                }
-            )
-        }
-    }
-
     func testFieldValueRoundTrip() throws {
         let values: [String: FieldValue] = [
             "string": .string("hello"),
