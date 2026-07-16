@@ -19,6 +19,7 @@ struct MetricsController: RouteCollection {
     func boot(routes: any RoutesBuilder) throws {
         let metrics = routes.grouped("metrics")
         metrics.get("active-users", use: activeUsers)
+        metrics.get("retention", use: retention)
         metrics.get("series", use: series)
     }
 
@@ -37,6 +38,23 @@ struct MetricsController: RouteCollection {
 
         let series = try await ActiveUserService.series(from: from, to: to, on: req.db)
         return ActiveUsersResponse(series: series)
+    }
+
+    /// `GET /metrics/retention?from=<ms>&to=<ms>` — a weekly retention-cohort
+    /// table over the half-open `[from, to)` range of install weeks. Both
+    /// bounds are milliseconds since the Unix epoch; `to` defaults to now and
+    /// `from` to 90 days before `to`, like `activeUsers`.
+    ///
+    func retention(req: Request) async throws -> RetentionResponse {
+        let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
+        let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
+
+        guard from < to else {
+            throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
+        }
+
+        let cohorts = try await RetentionService.cohorts(from: from, to: to, on: req.db)
+        return RetentionResponse(cohorts: cohorts)
     }
 
     /// `GET /metrics/series?name=<name>&category=<cat>&values=int|double&bucket=hour|day|week&from=<ms>&to=<ms>`

@@ -93,6 +93,23 @@ func makeSession(start: Date, installID: String, sessionID: String = UUID().uuid
     )
 }
 
+func makeInstall(date: Date, installID: String) -> Record {
+    makeRecord(
+        type: "Install",
+        name: installID,
+        fields: [
+            "date": .date(date),
+            "install_id": .string(installID),
+            "device_id": .string(installID),
+            "hour": .date(date.startOfHour),
+            "day": .date(date.startOfDay),
+            "week": .date(date.startOfWeek),
+            "month": .date(date.startOfMonth),
+            "version": .int(1),
+        ]
+    )
+}
+
 func makeMetric(type: String = "IntMetric", name: String, category: String, date: Date, value: FieldValue) -> Record {
     makeRecord(
         type: type,
@@ -153,6 +170,21 @@ func activeUsers(from: Date, to: Date, on app: Application) async throws -> [Act
         }
     )
     return response!.series
+}
+
+func retention(from: Date, to: Date, on app: Application) async throws -> [RetentionCohortPoint] {
+    let fromMs = Int64((from.timeIntervalSince1970 * 1000).rounded())
+    let toMs = Int64((to.timeIntervalSince1970 * 1000).rounded())
+    var response: RetentionResponse?
+    try await app.test(
+        .GET, "api/v1/metrics/retention?from=\(fromMs)&to=\(toMs)",
+        headers: .authorized,
+        afterResponse: { res async throws in
+            XCTAssertEqual(res.status, .ok, res.body.string)
+            response = try res.content.decode(RetentionResponse.self)
+        }
+    )
+    return response!.cohorts
 }
 
 func metricSeries(name: String? = nil, category: String? = nil, values: String? = nil, bucket: String? = nil, from: Date, to: Date, on app: Application) async throws -> [MetricSeriesGroup] {
