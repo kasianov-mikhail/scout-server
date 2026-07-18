@@ -31,6 +31,16 @@ enum MetricSeriesService {
     static let intMetricType = "IntMetric"
     static let doubleMetricType = "DoubleMetric"
 
+    /// Which namespace a `name` resolves against. Absent, the server infers it
+    /// from the name — counting a lifecycle type and any same-named event into
+    /// one group. An explicit source keeps the two namespaces apart, so a
+    /// custom event named like a lifecycle counter (e.g. "Session") is neither
+    /// shadowed nor conflated.
+    ///
+    enum Source: String {
+        case event, lifecycle, metric
+    }
+
     /// The granularity of a series point. `week` starts on Sunday, matching
     /// the rest of the date bucketing.
     ///
@@ -60,17 +70,17 @@ enum MetricSeriesService {
     /// year-wide category stays compact. The range snaps down to the bucket
     /// containing `from`, so the first bucket is whole.
     ///
-    static func series(name: String?, category: String?, values: String?, bucket: Bucket, byVersion: Bool, from: Date, to: Date, on database: any Database) async throws -> [MetricSeriesGroup] {
+    static func series(name: String?, category: String?, values: String?, bucket: Bucket, byVersion: Bool, source: Source?, from: Date, to: Date, on database: any Database) async throws -> [MetricSeriesGroup] {
         let constraints = Constraints(name: name, category: category, dateRange: bucket.start(of: from)..<to)
 
         var intTotals: [GroupKey: [Date: Int64]] = [:]
         if values != "double" {
-            intTotals = fold(try await intRows(constraints, on: database), bucket: bucket, byVersion: byVersion) { $0.totalInt ?? 0 }
+            intTotals = fold(try await intRows(constraints, source: source, on: database), bucket: bucket, byVersion: byVersion) { $0.totalInt ?? 0 }
         }
 
         var doubleTotals: [GroupKey: [Date: Double]] = [:]
         if values != "int" {
-            doubleTotals = fold(try await doubleRows(constraints, on: database), bucket: bucket, byVersion: byVersion) { $0.totalDouble ?? 0 }
+            doubleTotals = fold(try await doubleRows(constraints, source: source, on: database), bucket: bucket, byVersion: byVersion) { $0.totalDouble ?? 0 }
         }
 
         var groups: [MetricSeriesGroup] = []
@@ -99,27 +109,51 @@ enum MetricSeriesService {
     /// counts for `VersionCrash`, and `IntMetric` value sums, honoring the
     /// name/category constraints.
     ///
-    private static func intRows(_ constraints: Constraints, on database: any Database) async throws -> [HourRow] {
+    private static func intRows(_ constraints: Constraints, source: Source?, on database: any Database) async throws -> [HourRow] {
         var rows: [HourRow] = []
 
-        if constraints.category == nil {
-            for type in lifecycleTypes where constraints.name == nil || constraints.name == type {
-                rows += try await countRows(recordType: type, named: type, constraints: constraints, on: database)
-            }
-            if constraints.name == nil || constraints.name == versionCrashName {
-                rows += try await firstCrashRows(constraints, on: database)
-            }
+        switch source {
+        case .event:
             rows += try await countRows(recordType: "Event", named: nil, constraints: constraints, on: database)
+        case .lifecycle:
+            rows += try await lifecycleRows(constraints, on: database)
+        case .metric:
+            rows += try await sumRows(recordType: intMetricType, constraints: constraints, on: database)
+        case nil:
+            if constraints.category == nil {
+                rows += try await lifecycleRows(constraints, on: database)
+                rows += try await countRows(recordType: "Event", named: nil, constraints: constraints, on: database)
+            }
+            rows += try await sumRows(recordType: intMetricType, constraints: constraints, on: database)
         }
-
-        rows += try await sumRows(recordType: intMetricType, constraints: constraints, on: database)
 
         return rows
     }
 
-    /// Hourly double rows: `DoubleMetric` value sums.
-    private static func doubleRows(_ constraints: Constraints, on database: any Database) async throws -> [HourRow] {
-        try await sumRows(recordType: doubleMetricType, constraints: constraints, on: database)
+    /// Per-hour lifecycle-type record counts plus the `VersionCrash`
+    /// first-crash counts, honoring the name constraint.
+    ///
+    private static func lifecycleRows(_ constraints: Constraints, on database: any Database) async throws -> [HourRow] {
+        var rows: [HourRow] = []
+        for type in lifecycleTypes where constraints.name == nil || constraints.name == type {
+            rows += try await countRows(recordType: type, named: type, constraints: constraints, on: database)
+        }
+        if constraints.name == nil || constraints.name == versionCrashName {
+            rows += try await firstCrashRows(constraints, on: database)
+        }
+        return rows
+    }
+
+    /// Hourly double rows: `DoubleMetric` value sums. Only the metric-bearing
+    /// sources carry them; an explicit event or lifecycle source has none.
+    ///
+    private static func doubleRows(_ constraints: Constraints, source: Source?, on database: any Database) async throws -> [HourRow] {
+        switch source {
+        case .event, .lifecycle:
+            []
+        case .metric, nil:
+            try await sumRows(recordType: doubleMetricType, constraints: constraints, on: database)
+        }
     }
 
     /// Per-hour record counts; `named` overrides the series name for
