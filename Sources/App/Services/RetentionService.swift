@@ -72,7 +72,7 @@ enum RetentionService {
             let counts = retained[week] ?? [:]
 
             let cells = dayOffsets.enumerated().map { index, offset -> Int? in
-                let matured = calendar.date(byAdding: .day, value: 6 + offset, to: week)!
+                let matured = calendar.date(byAdding: .day, value: 7 + offset, to: week)!
                 guard matured < to else {
                     return nil
                 }

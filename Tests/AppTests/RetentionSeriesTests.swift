@@ -101,6 +101,32 @@ final class RetentionSeriesTests: XCTestCase {
         }
     }
 
+    func testMaturityRequiresFullCohortWeek() async throws {
+        try await withApp { app in
+            let installDay = utcDate(2026, 7, 20)
+
+            try await write(
+                [
+                    makeInstall(date: installDay, installID: "a"),
+                    makeSession(start: installDay.addingTimeInterval(3600), installID: "a"),
+                ],
+                to: app
+            )
+
+            let week = installDay.startOfWeek
+            let from = utcDate(2026, 5, 1)
+
+            // Day-0 stays nil until the whole cohort week plus the offset has
+            // fully elapsed (week + 7 + 0 days), not merely the last install's
+            // day-0 calendar day.
+            let atBoundary = try await retention(from: from, to: week.addingTimeInterval(7 * 86_400), on: app)
+            XCTAssertNil(retained(try XCTUnwrap(cohort(atBoundary, week: week)), offset: 0))
+
+            let pastBoundary = try await retention(from: from, to: week.addingTimeInterval(7 * 86_400 + 1), on: app)
+            XCTAssertEqual(retained(try XCTUnwrap(cohort(pastBoundary, week: week)), offset: 0), 1)
+        }
+    }
+
     func testEmptyRangeIsRejected() async throws {
         try await withApp { app in
             let to = utcDate(2026, 6, 1)
