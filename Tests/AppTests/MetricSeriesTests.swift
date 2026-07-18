@@ -292,6 +292,84 @@ final class MetricSeriesTests: XCTestCase {
         }
     }
 
+    func testEventSourceReachesEventNamedLikeLifecycleCounter() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeEvent(name: "Session", date: utcDate(2026, 6, 10, 9)),
+                    makeEvent(name: "Session", date: utcDate(2026, 6, 10, 9, 30)),
+                    makeSession(start: utcDate(2026, 6, 10, 9), installID: "a"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "Session", source: "event",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            // Only the two custom "Session" events are counted; the Session
+            // lifecycle record no longer conflates into the total.
+            XCTAssertEqual(groups.map(\.name), ["Session"])
+            XCTAssertEqual(value(groups, "Session", utcDate(2026, 6, 10)), .int(2))
+        }
+    }
+
+    func testLifecycleSourceIgnoresSameNamedEvent() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeEvent(name: "Session", date: utcDate(2026, 6, 10, 9)),
+                    makeSession(start: utcDate(2026, 6, 10, 9), installID: "a"),
+                    makeSession(start: utcDate(2026, 6, 10, 14), installID: "b"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "Session", source: "lifecycle",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            // Only the two Session records are counted; the same-named custom
+            // event is excluded.
+            XCTAssertEqual(value(groups, "Session", utcDate(2026, 6, 10)), .int(2))
+        }
+    }
+
+    func testMetricSourceExcludesLifecycleAndEvents() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeEvent(name: "requests", date: utcDate(2026, 6, 10, 9)),
+                    makeMetric(name: "requests", category: "counter", date: utcDate(2026, 6, 10, 9), value: .int(5)),
+                    makeMetric(name: "requests", category: "counter", date: utcDate(2026, 6, 10, 15), value: .int(7)),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "requests", source: "metric",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            // Only the IntMetric sums surface; the same-named event is excluded.
+            XCTAssertEqual(value(groups, "requests", utcDate(2026, 6, 10)), .int(12))
+        }
+    }
+
+    func testUnknownSourceIsRejected() async throws {
+        try await withApp { app in
+            try await app.test(
+                .GET, "api/v1/metrics/series?name=login&source=widget&from=0&to=1",
+                headers: .authorized,
+                afterResponse: { res async in
+                    XCTAssertEqual(res.status, .badRequest)
+                }
+            )
+        }
+    }
+
     func testUnknownByIsRejected() async throws {
         try await withApp { app in
             try await app.test(

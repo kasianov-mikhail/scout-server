@@ -57,13 +57,16 @@ struct MetricsController: RouteCollection {
         return RetentionResponse(cohorts: cohorts)
     }
 
-    /// `GET /metrics/series?name=<name>&category=<cat>&values=int|double&bucket=hour|day|week&by=version&from=<ms>&to=<ms>`
+    /// `GET /metrics/series?name=<name>&category=<cat>&values=int|double&bucket=hour|day|week&by=version&source=event|lifecycle|metric&from=<ms>&to=<ms>`
     /// — a name-grouped, value-per-bucket series for metric, event, or
     /// lifecycle names. `name` and `category` are optional filters; omitting
     /// both returns every series the raw records carry. `values` picks the
     /// flavor (inferred when omitted), `bucket` defaults to `day`,
     /// `by=version` splits the groups by app version, and the range defaults
-    /// to the trailing 90 days, like `activeUsers`.
+    /// to the trailing 90 days, like `activeUsers`. `source` pins the
+    /// namespace a `name` resolves against — an event, a lifecycle counter, or
+    /// a metric — so a name shared across namespaces isn't guessed; omitting it
+    /// keeps the original infer-from-name behavior.
     ///
     func series(req: Request) async throws -> MetricSeriesResponse {
         let name = req.query[String.self, at: "name"].flatMap { $0.isEmpty ? nil : $0 }
@@ -84,6 +87,14 @@ struct MetricsController: RouteCollection {
             throw Abort(.badRequest, reason: "Unknown grouping '\(by)'; expected version")
         }
 
+        let sourceName = req.query[String.self, at: "source"].flatMap { $0.isEmpty ? nil : $0 }
+        let source = try sourceName.map { name -> MetricSeriesService.Source in
+            guard let source = MetricSeriesService.Source(rawValue: name) else {
+                throw Abort(.badRequest, reason: "Unknown source '\(name)'; expected event, lifecycle, or metric")
+            }
+            return source
+        }
+
         let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
         let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
 
@@ -91,7 +102,7 @@ struct MetricsController: RouteCollection {
             throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
         }
 
-        let series = try await MetricSeriesService.series(name: name, category: category, values: values, bucket: bucket, byVersion: by == "version", from: from, to: to, on: req.db)
+        let series = try await MetricSeriesService.series(name: name, category: category, values: values, bucket: bucket, byVersion: by == "version", source: source, from: from, to: to, on: req.db)
         return MetricSeriesResponse(series: series)
     }
 
