@@ -57,7 +57,7 @@ struct MetricsController: RouteCollection {
         return RetentionResponse(cohorts: cohorts)
     }
 
-    /// `GET /metrics/series?name=<name>&category=<cat>&values=int|double&bucket=hour|day|week&by=version&source=event|lifecycle|metric&from=<ms>&to=<ms>`
+    /// `GET /metrics/series?name=<name>&category=<cat>&values=int|double&bucket=hour|day|week&by=version&source=event|lifecycle|metric&reduce=sum|last&from=<ms>&to=<ms>`
     /// — a name-grouped, value-per-bucket series for metric, event, or
     /// lifecycle names. `name` and `category` are optional filters; omitting
     /// both returns every series the raw records carry. `values` picks the
@@ -66,7 +66,10 @@ struct MetricsController: RouteCollection {
     /// to the trailing 90 days, like `activeUsers`. `source` pins the
     /// namespace a `name` resolves against — an event, a lifecycle counter, or
     /// a metric — so a name shared across namespaces isn't guessed; omitting it
-    /// keeps the original infer-from-name behavior.
+    /// keeps the original infer-from-name behavior. `reduce` picks how a bucket
+    /// folds its observations: `sum` accumulates (the default, for counters and
+    /// timers), while `last` keeps the newest value, which is what a gauge
+    /// needs; a `last` reduce spans metrics only and keeps zero readings.
     ///
     func series(req: Request) async throws -> MetricSeriesResponse {
         let name = req.query[String.self, at: "name"].flatMap { $0.isEmpty ? nil : $0 }
@@ -95,6 +98,11 @@ struct MetricsController: RouteCollection {
             return source
         }
 
+        let reduceName = req.query[String.self, at: "reduce"] ?? MetricSeriesService.Reduce.sum.rawValue
+        guard let reduce = MetricSeriesService.Reduce(rawValue: reduceName) else {
+            throw Abort(.badRequest, reason: "Unknown reduce '\(reduceName)'; expected sum or last")
+        }
+
         let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
         let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
 
@@ -102,7 +110,7 @@ struct MetricsController: RouteCollection {
             throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
         }
 
-        let series = try await MetricSeriesService.series(name: name, category: category, values: values, bucket: bucket, byVersion: by == "version", source: source, from: from, to: to, on: req.db)
+        let series = try await MetricSeriesService.series(name: name, category: category, values: values, bucket: bucket, byVersion: by == "version", source: source, reduce: reduce, from: from, to: to, on: req.db)
         return MetricSeriesResponse(series: series)
     }
 

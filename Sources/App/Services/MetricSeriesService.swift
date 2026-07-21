@@ -41,6 +41,14 @@ enum MetricSeriesService {
         case event, lifecycle, metric
     }
 
+    /// How a bucket folds the observations inside it. `sum` accumulates, which
+    /// suits counters and timers; `last` keeps the newest observation, which is
+    /// what a gauge — a point-in-time value — needs.
+    ///
+    enum Reduce: String {
+        case sum, last
+    }
+
     /// The granularity of a series point. `week` starts on Sunday, matching
     /// the rest of the date bucketing.
     ///
@@ -70,23 +78,25 @@ enum MetricSeriesService {
     /// year-wide category stays compact. The range snaps down to the bucket
     /// containing `from`, so the first bucket is whole.
     ///
-    static func series(name: String?, category: String?, values: String?, bucket: Bucket, byVersion: Bool, source: Source?, from: Date, to: Date, on database: any Database) async throws -> [MetricSeriesGroup] {
+    static func series(name: String?, category: String?, values: String?, bucket: Bucket, byVersion: Bool, source: Source?, reduce: Reduce = .sum, from: Date, to: Date, on database: any Database) async throws -> [MetricSeriesGroup] {
         let constraints = Constraints(name: name, category: category, dateRange: bucket.start(of: from)..<to)
 
         var intTotals: [GroupKey: [Date: Int64]] = [:]
         if values != "double" {
-            intTotals = fold(try await intRows(constraints, source: source, on: database), bucket: bucket, byVersion: byVersion) { $0.totalInt ?? 0 }
+            let rows = try await intRows(constraints, source: source, reduce: reduce, on: database)
+            intTotals = fold(rows, bucket: bucket, byVersion: byVersion, reduce: reduce) { $0.totalInt ?? 0 }
         }
 
         var doubleTotals: [GroupKey: [Date: Double]] = [:]
         if values != "int" {
-            doubleTotals = fold(try await doubleRows(constraints, source: source, on: database), bucket: bucket, byVersion: byVersion) { $0.totalDouble ?? 0 }
+            let rows = try await doubleRows(constraints, source: source, reduce: reduce, on: database)
+            doubleTotals = fold(rows, bucket: bucket, byVersion: byVersion, reduce: reduce) { $0.totalDouble ?? 0 }
         }
 
         var groups: [MetricSeriesGroup] = []
 
         for (key, totals) in intTotals {
-            let points = sparsePoints(totals) { .int($0) }
+            let points = points(totals, reduce: reduce) { .int($0) }
             if points.count > 0 {
                 groups.append(MetricSeriesGroup(name: key.name, category: key.category, version: key.version, points: points))
             }
@@ -96,7 +106,7 @@ enum MetricSeriesService {
             if values == nil, intTotals[key] != nil {
                 continue
             }
-            let points = sparsePoints(totals) { .double($0) }
+            let points = points(totals, reduce: reduce) { .double($0) }
             if points.count > 0 {
                 groups.append(MetricSeriesGroup(name: key.name, category: key.category, version: key.version, points: points))
             }
@@ -109,8 +119,13 @@ enum MetricSeriesService {
     /// counts for `VersionCrash`, and `IntMetric` value sums, honoring the
     /// name/category constraints.
     ///
-    private static func intRows(_ constraints: Constraints, source: Source?, on database: any Database) async throws -> [HourRow] {
+    private static func intRows(_ constraints: Constraints, source: Source?, reduce: Reduce, on database: any Database) async throws -> [HourRow] {
         var rows: [HourRow] = []
+
+        // Record counts have no "latest" value, so a last reduce only spans metrics.
+        guard reduce == .sum else {
+            return try await lastRows(recordType: intMetricType, constraints: constraints, on: database)
+        }
 
         switch source {
         case .event:
@@ -147,12 +162,14 @@ enum MetricSeriesService {
     /// Hourly double rows: `DoubleMetric` value sums. Only the metric-bearing
     /// sources carry them; an explicit event or lifecycle source has none.
     ///
-    private static func doubleRows(_ constraints: Constraints, source: Source?, on database: any Database) async throws -> [HourRow] {
+    private static func doubleRows(_ constraints: Constraints, source: Source?, reduce: Reduce, on database: any Database) async throws -> [HourRow] {
         switch source {
         case .event, .lifecycle:
             []
         case .metric, nil:
-            try await sumRows(recordType: doubleMetricType, constraints: constraints, on: database)
+            reduce == .last
+                ? try await lastRows(recordType: doubleMetricType, constraints: constraints, on: database)
+                : try await sumRows(recordType: doubleMetricType, constraints: constraints, on: database)
         }
     }
 
@@ -247,27 +264,73 @@ enum MetricSeriesService {
         return rows.filter(constraints.matches)
     }
 
-    /// Sums the hourly rows into the requested granularity, keyed by name,
-    /// category, bucket start, and — when `byVersion` — app version.
+    /// The newest value in each hour, per metric name and telemetry category —
+    /// the gauge counterpart of `sumRows`. Rows without a date carry no
+    /// ordering, so they cannot be "latest" and are skipped.
     ///
-    private static func fold<T: AdditiveArithmetic & Equatable>(_ rows: [HourRow], bucket: Bucket, byVersion: Bool, value: (HourRow) -> T) -> [GroupKey: [Date: T]] {
+    private static func lastRows(recordType: String, constraints: Constraints, on database: any Database) async throws -> [HourRow] {
+        let sql = try database.sql()
+        let range = constraints.hourRange
+
+        let isInt = recordType == intMetricType
+        let projection = isInt ? "CAST(value_int AS BIGINT) AS total_int" : "value_double AS total_double"
+        let column = isInt ? "total_int" : "total_double"
+
+        let rows = try await sql.raw(
+            """
+            SELECT name, category, hour, \(unsafeRaw: column)
+            FROM (
+                SELECT name, category, hour_epoch AS hour, \(unsafeRaw: projection),
+                       ROW_NUMBER() OVER (PARTITION BY name, category, hour_epoch ORDER BY date DESC) AS rn
+                FROM records
+                WHERE record_type = \(bind: recordType) AND name IS NOT NULL AND date IS NOT NULL
+                  AND hour_epoch >= \(bind: range.lowerBound) AND hour_epoch < \(bind: range.upperBound)
+            ) AS ranked
+            WHERE rn = 1
+            """
+        ).all(decoding: HourRow.self)
+
+        return rows.filter(constraints.matches)
+    }
+
+    /// Folds the hourly rows into the requested granularity, keyed by name,
+    /// category, bucket start, and — when `byVersion` — app version. A `sum`
+    /// reduce accumulates; a `last` reduce keeps the value of the newest hour
+    /// in each bucket.
+    ///
+    private static func fold<T: AdditiveArithmetic & Equatable>(_ rows: [HourRow], bucket: Bucket, byVersion: Bool, reduce: Reduce, value: (HourRow) -> T) -> [GroupKey: [Date: T]] {
         var totals: [GroupKey: [Date: T]] = [:]
+        var latestHour: [GroupKey: [Date: Int64]] = [:]
+
         for row in rows {
             guard let name = row.name else {
                 continue
             }
             let key = GroupKey(name: name, category: row.category, version: byVersion ? row.appVersion : nil)
             let bucketStart = bucket.start(of: Date(timeIntervalSince1970: Double(row.hour)))
-            totals[key, default: [:]][bucketStart, default: .zero] += value(row)
+
+            switch reduce {
+            case .sum:
+                totals[key, default: [:]][bucketStart, default: .zero] += value(row)
+            case .last:
+                if let seen = latestHour[key]?[bucketStart], seen >= row.hour {
+                    continue
+                }
+                latestHour[key, default: [:]][bucketStart] = row.hour
+                totals[key, default: [:]][bucketStart] = value(row)
+            }
         }
+
         return totals
     }
 
-    /// The non-zero buckets of one group as wire points, sorted by date.
+    /// The buckets of one group as wire points, sorted by date. A `sum` reduce
+    /// drops empty buckets so a year-wide category stays compact; a `last`
+    /// reduce keeps zeros, since zero is a legitimate gauge reading.
     ///
-    private static func sparsePoints<T: AdditiveArithmetic & Equatable>(_ totals: [Date: T], value: (T) -> FieldValue) -> [MetricSeriesPoint] {
+    private static func points<T: AdditiveArithmetic & Equatable>(_ totals: [Date: T], reduce: Reduce, value: (T) -> FieldValue) -> [MetricSeriesPoint] {
         totals
-            .filter { $0.value != .zero }
+            .filter { reduce == .last || $0.value != .zero }
             .sorted { $0.key < $1.key }
             .map { MetricSeriesPoint(date: Int64(($0.key.timeIntervalSince1970 * 1000).rounded()), value: value($0.value)) }
     }
