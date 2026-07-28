@@ -16,9 +16,6 @@ let package = Package(
         .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.8.0"),
         .package(url: "https://github.com/vapor/fluent-sqlite-driver.git", from: "4.6.0"),
         .package(url: "https://github.com/vapor/sql-kit.git", from: "3.28.0"),
-        // swift-system 1.7.0 shipped a MemberImportVisibility regression that
-        // broke swift-nio's Linux build; require 1.7.1+ where it's fixed.
-        .package(url: "https://github.com/apple/swift-system.git", from: "1.7.1"),
     ],
     targets: [
         .executableTarget(
@@ -29,9 +26,6 @@ let package = Package(
                 .product(name: "FluentPostgresDriver", package: "fluent-postgres-driver"),
                 .product(name: "FluentSQLiteDriver", package: "fluent-sqlite-driver"),
                 .product(name: "SQLKit", package: "sql-kit"),
-                // Not used directly; referenced so the version pin in the
-                // package dependencies above counts as "used by a target".
-                .product(name: "SystemPackage", package: "swift-system"),
             ],
             swiftSettings: swiftSettings
         ),
