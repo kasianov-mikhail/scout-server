@@ -14,8 +14,8 @@ struct ActiveUsersResponse: Content, Equatable {
     let series: [ActiveUserPoint]
 }
 
-/// One day of the series: distinct active installs as of `date`, counted over
-/// the trailing day (`dau`), 7 days (`wau`), and calendar month (`mau`).
+/// One day of the series: distinct active devices as of `date`, counted over
+/// the trailing day (`dau`), 7 days (`wau`), and 30 days (`mau`).
 ///
 /// `date` is milliseconds since the Unix epoch at UTC midnight, matching the
 /// rest of the wire format.

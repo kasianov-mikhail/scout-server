@@ -74,12 +74,12 @@ func makeEvent(name: String, date: Date, level: String = "info", sessionID: Stri
     )
 }
 
-func makeSession(start: Date, installID: String, sessionID: String = UUID().uuidString, appVersion: String? = nil) -> Record {
+func makeSession(start: Date, installID: String, deviceID: String? = nil, sessionID: String = UUID().uuidString, appVersion: String? = nil) -> Record {
     var fields: [String: FieldValue] = [
         "start_date": .date(start),
         "session_id": .string(sessionID),
         "install_id": .string(installID),
-        "device_id": .string(installID),
+        "device_id": .string(deviceID ?? installID),
         "launch_id": .string(UUID().uuidString),
         "hour": .date(start.startOfHour),
         "day": .date(start.startOfDay),
@@ -91,6 +91,26 @@ func makeSession(start: Date, installID: String, sessionID: String = UUID().uuid
         fields["app_version"] = .string(appVersion)
     }
     return makeRecord(type: "Session", name: sessionID, fields: fields)
+}
+
+func makeVisit(date: Date, deviceID: String, installID: String = UUID().uuidString) -> Record {
+    makeRecord(
+        type: "Visit",
+        // The client names the marker after the device and day, so a re-sent
+        // marker overwrites its twin instead of counting twice.
+        name: "\(deviceID)-\(Int64((date.startOfDay.timeIntervalSince1970 * 1000).rounded()))",
+        fields: [
+            "date": .date(date),
+            "device_id": .string(deviceID),
+            "install_id": .string(installID),
+            "launch_id": .string(UUID().uuidString),
+            "hour": .date(date.startOfHour),
+            "day": .date(date.startOfDay),
+            "week": .date(date.startOfWeek),
+            "month": .date(date.startOfMonth),
+            "version": .int(1),
+        ]
+    )
 }
 
 func makeIncident(type: String, date: Date, installID: String? = nil, appVersion: String? = nil) -> Record {
