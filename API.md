@@ -7,5 +7,6 @@ All endpoints sit under `/api/v1` and require an API key, passed either as an `X
 - [`POST /api/v1/records/query`](docs/PostRecordsQuery.md)
 - [`GET /api/v1/records/:recordName`](docs/GetRecordsRecordName.md)
 - [`GET /api/v1/metrics/active-users`](docs/GetMetricsActiveUsers.md)
+- [`GET /api/v1/metrics/retention`](docs/GetMetricsRetention.md)
 - [`GET /api/v1/metrics/series`](docs/GetMetricsSeries.md)
 - [`GET /healthz`](docs/GetHealthz.md)
