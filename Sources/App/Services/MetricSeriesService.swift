@@ -97,7 +97,7 @@ enum MetricSeriesService {
 
         for (key, totals) in intTotals {
             let points = points(totals, reduce: reduce) { .int($0) }
-            if points.count > 0 {
+            if !points.isEmpty {
                 groups.append(MetricSeriesGroup(name: key.name, category: key.category, version: key.version, points: points))
             }
         }
@@ -107,7 +107,7 @@ enum MetricSeriesService {
                 continue
             }
             let points = points(totals, reduce: reduce) { .double($0) }
-            if points.count > 0 {
+            if !points.isEmpty {
                 groups.append(MetricSeriesGroup(name: key.name, category: key.category, version: key.version, points: points))
             }
         }
