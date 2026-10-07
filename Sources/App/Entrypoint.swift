@@ -20,7 +20,11 @@ enum Entrypoint {
             try await app.execute()
         } catch {
             app.logger.report(error: error)
-            try? await app.asyncShutdown()
+            do {
+                try await app.asyncShutdown()
+            } catch let shutdownError {
+                app.logger.report(error: shutdownError)
+            }
             throw error
         }
 
