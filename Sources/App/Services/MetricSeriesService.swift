@@ -27,13 +27,11 @@ enum MetricSeriesService {
     ///
     static let versionCrashName = "VersionCrash"
 
-    static let exitType = "Exit"
-
-    /// Daily MetricKit performance records. Each one carries a histogram
-    /// bucket count or a total for one metric, so its series take the
-    /// metric's name from the record instead of the record type.
+    /// Daily MetricKit readings, such as exit counts per reason or launch
+    /// time histogram buckets. Their series take the name from the record
+    /// instead of the record type.
     ///
-    static let performanceType = "Performance"
+    static let dailyMetricType = "DailyMetric"
 
     /// Raw metric record types clients upload; the server sums their values.
     static let intMetricType = "IntMetric"
@@ -154,8 +152,8 @@ enum MetricSeriesService {
     }
 
     /// Per-hour lifecycle-type record counts plus the `VersionCrash`
-    /// first-crash counts and the `Exit` and `Performance` value sums,
-    /// honoring the name constraint.
+    /// first-crash counts and the `DailyMetric` value sums, honoring the
+    /// name constraint.
     ///
     private static func lifecycleRows(_ constraints: Constraints, on database: any Database) async throws -> [HourRow] {
         var rows: [HourRow] = []
@@ -165,10 +163,7 @@ enum MetricSeriesService {
         if constraints.name == nil || constraints.name == versionCrashName {
             rows += try await firstCrashRows(constraints, on: database)
         }
-        if constraints.name == nil || constraints.name == exitType {
-            rows += try await exitRows(constraints, on: database)
-        }
-        rows += try await performanceRows(constraints, on: database)
+        rows += try await dailyMetricRows(constraints, on: database)
         return rows
     }
 
@@ -252,31 +247,10 @@ enum MetricSeriesService {
         return rows.filter(constraints.matches)
     }
 
-    private static func exitRows(_ constraints: Constraints, on database: any Database) async throws -> [HourRow] {
-        let sql = try database.sql()
-        let range = constraints.hourRange
-
-        let rows = try await sql.raw(
-            """
-            SELECT category, app_version, hour_epoch AS hour, CAST(SUM(value_int) AS BIGINT) AS total_int
-            FROM records
-            WHERE record_type = \(bind: exitType)
-              AND hour_epoch >= \(bind: range.lowerBound) AND hour_epoch < \(bind: range.upperBound)
-            GROUP BY category, app_version, hour_epoch
-            """
-        ).all(decoding: HourRow.self).map { row in
-            var row = row
-            row.name = exitType
-            return row
-        }
-
-        return rows.filter(constraints.matches)
-    }
-
-    /// Per-hour `Performance` value sums, grouped by the metric name, the
-    /// histogram bucket in `category`, and the app version.
+    /// Per-hour `DailyMetric` value sums, grouped by the metric name, the
+    /// category, and the app version.
     ///
-    private static func performanceRows(_ constraints: Constraints, on database: any Database) async throws -> [HourRow] {
+    private static func dailyMetricRows(_ constraints: Constraints, on database: any Database) async throws -> [HourRow] {
         let sql = try database.sql()
         let range = constraints.hourRange
 
@@ -284,7 +258,7 @@ enum MetricSeriesService {
             """
             SELECT name, category, app_version, hour_epoch AS hour, CAST(SUM(value_int) AS BIGINT) AS total_int
             FROM records
-            WHERE record_type = \(bind: performanceType) AND name IS NOT NULL
+            WHERE record_type = \(bind: dailyMetricType) AND name IS NOT NULL
               AND hour_epoch >= \(bind: range.lowerBound) AND hour_epoch < \(bind: range.upperBound)
             GROUP BY name, category, app_version, hour_epoch
             """

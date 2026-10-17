@@ -1,6 +1,6 @@
 # `GET /api/v1/metrics/series`
 
-A name-grouped, pre-aggregated value-per-bucket series: record counts for lifecycle types (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`, `Hang`) and event names, value sums for `IntMetric` / `DoubleMetric` names, first-crash-per-install counts under the `VersionCrash` pseudo-name, `Exit` value sums split by exit reason, and `Performance` value sums split by metric and histogram bucket. One group per name, so a single request can carry a whole telemetry category — or, with no filters at all, the entire record stream.
+A name-grouped, pre-aggregated value-per-bucket series: record counts for lifecycle types (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`, `Hang`) and event names, value sums for `IntMetric` / `DoubleMetric` names, first-crash-per-install counts under the `VersionCrash` pseudo-name, and `DailyMetric` value sums split by name and category. One group per name, so a single request can carry a whole telemetry category — or, with no filters at all, the entire record stream.
 
 | Parameter | Meaning |
 | --- | --- |
@@ -17,9 +17,7 @@ Both filters are optional and independent: `name` alone narrows to one series, `
 
 Each group carries one point per non-empty bucket over the range (empty buckets are omitted, so the series is sparse), each a typed `value` — `int` for counts and `IntMetric` sums, `double` for `DoubleMetric` sums. A `category` filter excludes lifecycle and event names, which carry no category. The range snaps down to the bucket containing `from`, so the first bucket is whole.
 
-`Exit` is a lifecycle name whose records each carry a day's count of app exits for one reason: the `category` field holds the reason and `value` the count. Its series sums `value` instead of counting records and keeps one group per reason, so `category` narrows it to one reason when `source=lifecycle` is set.
-
-`Performance` records each carry a day's MetricKit reading for one metric: `name` holds the metric, `category` the histogram bucket (absent for a plain total), and `value` the integer count or total. Unlike other lifecycle records, their series take the metric as the group name, such as `launch_time`, and keep one group per bucket. The series sums `value`, so a bucket's counts from many devices add up into one histogram.
+`DailyMetric` records each carry a day's MetricKit reading for one name: `category` holds the exit reason or histogram bucket (absent for a plain total), and `value` the integer count or total. Unlike other lifecycle records, their series take the group name from the record, such as `exit` or `launch_time`, and keep one group per category. The series sums `value`, so counts from many devices add up, and `category` narrows a name to one category when `source=lifecycle` is set.
 
 A `reduce=last` request spans metric records only, since record counts have no "latest" value, and it keeps zero readings rather than dropping them — zero is a legitimate gauge value. Records without a `date` carry no ordering and so are never the latest.
 

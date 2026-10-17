@@ -358,57 +358,35 @@ final class MetricSeriesTests: XCTestCase {
         }
     }
 
-    func testExitSumsSplitByReasonAndVersion() async throws {
+    func testDailyMetricCategoryNarrowsToOneCategory() async throws {
         try await withApp { app in
             try await write(
                 [
-                    makeExit(reason: "watchdog", count: 2, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
-                    makeExit(reason: "watchdog", count: 3, date: utcDate(2026, 6, 10, 15), appVersion: "3.2.0"),
-                    makeExit(reason: "normal", count: 40, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
-                    makeExit(reason: "watchdog", count: 1, date: utcDate(2026, 6, 10, 9), appVersion: "3.1.4"),
+                    makeDailyMetric(name: "exit", category: "watchdog", value: 2, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeDailyMetric(name: "exit", category: "normal", value: 40, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
                 ],
                 to: app
             )
 
             let groups = try await metricSeries(
-                name: "Exit", by: "version", source: "lifecycle",
-                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
-            )
-
-            let totals = groups.map { "\($0.category ?? "") \($0.version ?? "") \($0.points.first?.value.intValue ?? 0)" }
-            XCTAssertEqual(totals, ["normal 3.2.0 40", "watchdog 3.1.4 1", "watchdog 3.2.0 5"])
-        }
-    }
-
-    func testExitCategoryNarrowsToOneReason() async throws {
-        try await withApp { app in
-            try await write(
-                [
-                    makeExit(reason: "watchdog", count: 2, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
-                    makeExit(reason: "normal", count: 40, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
-                ],
-                to: app
-            )
-
-            let groups = try await metricSeries(
-                name: "Exit", category: "watchdog", source: "lifecycle",
+                name: "exit", category: "watchdog", source: "lifecycle",
                 from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
             )
 
             XCTAssertEqual(groups.map(\.category), ["watchdog"])
-            XCTAssertEqual(value(groups, "Exit", utcDate(2026, 6, 10)), .int(2))
+            XCTAssertEqual(value(groups, "exit", utcDate(2026, 6, 10)), .int(2))
         }
     }
 
-    func testPerformanceSumsSplitByMetricBucketAndVersion() async throws {
+    func testDailyMetricSumsSplitByNameCategoryAndVersion() async throws {
         try await withApp { app in
             try await write(
                 [
-                    makePerformance(metric: "launch_time", bucket: "100", value: 4, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
-                    makePerformance(metric: "launch_time", bucket: "100", value: 6, date: utcDate(2026, 6, 10, 15), appVersion: "3.2.0"),
-                    makePerformance(metric: "launch_time", bucket: "200", value: 1, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
-                    makePerformance(metric: "launch_time", bucket: "100", value: 3, date: utcDate(2026, 6, 10, 9), appVersion: "3.1.4"),
-                    makePerformance(metric: "foreground_time", value: 3600, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeDailyMetric(name: "launch_time", category: "100", value: 4, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeDailyMetric(name: "launch_time", category: "100", value: 6, date: utcDate(2026, 6, 10, 15), appVersion: "3.2.0"),
+                    makeDailyMetric(name: "launch_time", category: "200", value: 1, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeDailyMetric(name: "launch_time", category: "100", value: 3, date: utcDate(2026, 6, 10, 9), appVersion: "3.1.4"),
+                    makeDailyMetric(name: "foreground_time", value: 3600, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
                 ],
                 to: app
             )
@@ -431,13 +409,13 @@ final class MetricSeriesTests: XCTestCase {
         }
     }
 
-    func testPerformanceNameNarrowsToOneMetric() async throws {
+    func testDailyMetricNameNarrowsToOneMetric() async throws {
         try await withApp { app in
             try await write(
                 [
-                    makePerformance(metric: "launch_time", bucket: "100", value: 4, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
-                    makePerformance(metric: "peak_memory", bucket: "150", value: 1, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
-                    makeExit(reason: "normal", count: 40, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeDailyMetric(name: "launch_time", category: "100", value: 4, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeDailyMetric(name: "peak_memory", category: "150", value: 1, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeDailyMetric(name: "exit", category: "normal", value: 40, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
                 ],
                 to: app
             )
