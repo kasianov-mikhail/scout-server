@@ -33,6 +33,7 @@ public func configure(_ app: Application) async throws {
 
     app.migrations.add(CreateRecord())
     app.migrations.add(AddVersionFields())
+    app.migrations.add(AddOSVersionField())
 
     app.apiKeys = APIKeys(
         keys: Environment.get("SCOUT_API_KEYS").map(APIKeys.parse) ?? [],

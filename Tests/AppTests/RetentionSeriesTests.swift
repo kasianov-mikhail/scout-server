@@ -115,6 +115,115 @@ final class RetentionSeriesTests: XCTestCase {
         }
     }
 
+    func testSegmentsSplitByFirstSessionOSMajor() async throws {
+        try await withApp { app in
+            let installDay = utcDate(2026, 6, 1)
+
+            try await write(
+                [
+                    makeInstall(date: installDay, installID: "a"),
+                    makeInstall(date: installDay, installID: "b"),
+                    makeInstall(date: installDay, installID: "c"),
+                    makeInstall(date: installDay, installID: "d"),
+                    makeSession(start: installDay.addingTimeInterval(3600), installID: "a", osVersion: "iOS 18.2"),
+                    makeSession(start: utcDate(2026, 6, 2, 10), installID: "a", osVersion: "iOS 19.0"),
+                    makeSession(start: installDay.addingTimeInterval(7200), installID: "b", osVersion: "iOS 18.1"),
+                    makeSession(start: installDay.addingTimeInterval(7200), installID: "c", osVersion: "iOS 17.5"),
+                    makeSession(start: installDay.addingTimeInterval(7200), installID: "d"),
+                ],
+                to: app
+            )
+
+            let cohorts = try await retention(from: utcDate(2026, 5, 1), to: utcDate(2026, 8, 1), on: app)
+            let point = try XCTUnwrap(cohort(cohorts, week: installDay.startOfWeek))
+
+            XCTAssertEqual(point.size, 4)
+            XCTAssertEqual(point.segments.map(\.name), ["iOS 17", "iOS 18"])
+
+            let recent = try XCTUnwrap(point.segments.first { $0.name == "iOS 18" })
+            XCTAssertEqual(recent.size, 2)
+            XCTAssertEqual(recent.retained.first, 2)
+            XCTAssertEqual(recent.retained[1], 1)
+
+            let older = try XCTUnwrap(point.segments.first { $0.name == "iOS 17" })
+            XCTAssertEqual(older.size, 1)
+            XCTAssertEqual(older.retained[1], 0)
+        }
+    }
+
+    func testSegmentsCountInstallsAffectedByIncidents() async throws {
+        try await withApp { app in
+            let installDay = utcDate(2026, 6, 1)
+
+            try await write(
+                [
+                    makeInstall(date: installDay, installID: "a"),
+                    makeInstall(date: installDay, installID: "b"),
+                    makeInstall(date: installDay, installID: "c"),
+                    makeSession(start: installDay.addingTimeInterval(3600), installID: "a", osVersion: "iOS 18.2"),
+                    makeSession(start: installDay.addingTimeInterval(3600), installID: "b", osVersion: "iOS 18.2"),
+                    makeSession(start: installDay.addingTimeInterval(3600), installID: "c", osVersion: "iOS 18.2"),
+                    makeCrash(date: utcDate(2026, 6, 3), installID: "a"),
+                    makeCrash(date: utcDate(2026, 6, 20), installID: "a"),
+                    makeHang(date: utcDate(2026, 7, 1, 23), installID: "a"),
+                    makeCrash(date: utcDate(2026, 7, 2), installID: "b"),
+                    makeHang(date: utcDate(2026, 6, 1, 5), installID: "c"),
+                ],
+                to: app
+            )
+
+            let cohorts = try await retention(from: utcDate(2026, 5, 1), to: utcDate(2026, 8, 1), on: app)
+            let point = try XCTUnwrap(cohort(cohorts, week: installDay.startOfWeek))
+            let segment = try XCTUnwrap(point.segments.first)
+
+            XCTAssertEqual(segment.size, 3)
+            XCTAssertEqual(segment.crashes, 1)
+            XCTAssertEqual(segment.hangs, 2)
+        }
+    }
+
+    func testSegmentMilestonesMatureWithTheCohort() async throws {
+        try await withApp { app in
+            let installDay = utcDate(2026, 7, 20)
+
+            try await write(
+                [
+                    makeInstall(date: installDay, installID: "a"),
+                    makeSession(start: installDay.addingTimeInterval(3600), installID: "a", osVersion: "iOS 18.2"),
+                ],
+                to: app
+            )
+
+            let cohorts = try await retention(from: utcDate(2026, 7, 1), to: utcDate(2026, 8, 1), on: app)
+            let point = try XCTUnwrap(cohort(cohorts, week: installDay.startOfWeek))
+            let segment = try XCTUnwrap(point.segments.first)
+
+            XCTAssertEqual(segment.retained.map { $0 == nil }, point.retained.map { $0 == nil })
+        }
+    }
+
+    func testMigrationBackfillsOSVersionOfStoredSessions() async throws {
+        try await withApp { app in
+            let installDay = utcDate(2026, 6, 1)
+
+            try await write(
+                [
+                    makeInstall(date: installDay, installID: "a"),
+                    makeSession(start: installDay.addingTimeInterval(3600), installID: "a", osVersion: "iOS 18.2"),
+                ],
+                to: app
+            )
+
+            try await AddOSVersionField().revert(on: app.db)
+            try await AddOSVersionField().prepare(on: app.db)
+
+            let cohorts = try await retention(from: utcDate(2026, 5, 1), to: utcDate(2026, 8, 1), on: app)
+            let point = try XCTUnwrap(cohort(cohorts, week: installDay.startOfWeek))
+
+            XCTAssertEqual(point.segments.map(\.name), ["iOS 18"])
+        }
+    }
+
     func testEmptyRangeIsRejected() async throws {
         try await withApp { app in
             let to = utcDate(2026, 6, 1)

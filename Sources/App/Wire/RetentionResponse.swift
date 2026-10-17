@@ -15,4 +15,13 @@ struct RetentionCohortPoint: Content, Equatable {
     let date: Int64
     let size: Int
     let retained: [Int?]
+    let segments: [RetentionSegmentPoint]
+}
+
+struct RetentionSegmentPoint: Content, Equatable {
+    let name: String
+    let size: Int
+    let retained: [Int?]
+    let crashes: Int
+    let hangs: Int
 }

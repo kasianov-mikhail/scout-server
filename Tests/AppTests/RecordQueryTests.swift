@@ -83,6 +83,60 @@ final class RecordQueryTests: XCTestCase {
         }
     }
 
+    func testPrefixMatchesWildcardCharactersLiterally() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeEvent(name: "cart_add", date: utcDate(2026, 6, 10, 9)),
+                    makeEvent(name: "cartXadd", date: utcDate(2026, 6, 10, 9)),
+                    makeEvent(name: "100%_done", date: utcDate(2026, 6, 10, 9)),
+                    makeEvent(name: "1000", date: utcDate(2026, 6, 10, 9)),
+                ],
+                to: app
+            )
+
+            let underscore = try await query(
+                QueryRequest(
+                    recordType: "Event",
+                    filters: [QueryFilter(field: "name", op: .beginsWith, value: .string("cart_"))]
+                ),
+                on: app
+            )
+            XCTAssertEqual(underscore.records.compactMap { $0.fields["name"]?.stringValue }, ["cart_add"])
+
+            let percent = try await query(
+                QueryRequest(
+                    recordType: "Event",
+                    filters: [QueryFilter(field: "name", op: .beginsWith, value: .string("100%"))]
+                ),
+                on: app
+            )
+            XCTAssertEqual(percent.records.compactMap { $0.fields["name"]?.stringValue }, ["100%_done"])
+        }
+    }
+
+    func testPrefixIsCaseSensitive() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeEvent(name: "Login", date: utcDate(2026, 6, 10, 9)),
+                    makeEvent(name: "login", date: utcDate(2026, 6, 10, 9)),
+                ],
+                to: app
+            )
+
+            let response = try await query(
+                QueryRequest(
+                    recordType: "Event",
+                    filters: [QueryFilter(field: "name", op: .beginsWith, value: .string("log"))]
+                ),
+                on: app
+            )
+
+            XCTAssertEqual(response.records.compactMap { $0.fields["name"]?.stringValue }, ["login"])
+        }
+    }
+
     func testSortsAndLimitsWithDesiredFields() async throws {
         try await withApp { app in
             try await write(

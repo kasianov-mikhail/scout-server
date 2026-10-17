@@ -50,6 +50,9 @@ final class RecordModel: Model, @unchecked Sendable {
     @OptionalField(key: "build_number")
     var buildNumber: String?
 
+    @OptionalField(key: "os_version")
+    var osVersion: String?
+
     @OptionalField(key: "date")
     var date: Date?
 
@@ -105,6 +108,7 @@ extension RecordModel {
         sessionID = fields["session_id"]?.stringValue
         appVersion = fields["app_version"]?.stringValue
         buildNumber = fields["build_number"]?.stringValue
+        osVersion = fields["os_version"]?.stringValue
         date = fields["date"]?.dateValue
         startDate = fields["start_date"]?.dateValue
         endDate = fields["end_date"]?.dateValue
@@ -182,6 +186,43 @@ struct AddVersionFields: AsyncMigration {
         try await database.schema(RecordModel.schema)
             .deleteField("app_version")
             .deleteField("build_number")
+            .update()
+    }
+}
+
+struct AddOSVersionField: AsyncMigration {
+    func prepare(on database: any Database) async throws {
+        try await database.schema(RecordModel.schema)
+            .field("os_version", .string)
+            .update()
+
+        var last: UUID?
+
+        while true {
+            let query = RecordModel.query(on: database)
+                .filter(\.$recordType == "Session")
+                .sort(\.$id)
+                .limit(500)
+            if let last {
+                query.filter(\.$id > last)
+            }
+
+            let page = try await query.all()
+            guard let tail = page.last else {
+                break
+            }
+
+            for model in page {
+                model.osVersion = model.payload["os_version"]?.stringValue
+                try await model.save(on: database)
+            }
+            last = tail.id
+        }
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.schema(RecordModel.schema)
+            .deleteField("os_version")
             .update()
     }
 }
