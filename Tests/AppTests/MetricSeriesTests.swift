@@ -400,6 +400,58 @@ final class MetricSeriesTests: XCTestCase {
         }
     }
 
+    func testPerformanceSumsSplitByMetricBucketAndVersion() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makePerformance(metric: "launch_time", bucket: "100", value: 4, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makePerformance(metric: "launch_time", bucket: "100", value: 6, date: utcDate(2026, 6, 10, 15), appVersion: "3.2.0"),
+                    makePerformance(metric: "launch_time", bucket: "200", value: 1, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makePerformance(metric: "launch_time", bucket: "100", value: 3, date: utcDate(2026, 6, 10, 9), appVersion: "3.1.4"),
+                    makePerformance(metric: "foreground_time", value: 3600, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                by: "version", source: "lifecycle",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            let totals = groups.map { "\($0.name) \($0.category ?? "-") \($0.version ?? "") \($0.points.first?.value.intValue ?? 0)" }
+            XCTAssertEqual(
+                totals,
+                [
+                    "foreground_time - 3.2.0 3600",
+                    "launch_time 100 3.1.4 3",
+                    "launch_time 100 3.2.0 10",
+                    "launch_time 200 3.2.0 1",
+                ]
+            )
+        }
+    }
+
+    func testPerformanceNameNarrowsToOneMetric() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makePerformance(metric: "launch_time", bucket: "100", value: 4, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makePerformance(metric: "peak_memory", bucket: "150", value: 1, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeExit(reason: "normal", count: 40, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "peak_memory", source: "lifecycle",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            XCTAssertEqual(groups.map(\.category), ["150"])
+            XCTAssertEqual(value(groups, "peak_memory", utcDate(2026, 6, 10)), .int(1))
+        }
+    }
+
     func testUnknownSourceIsRejected() async throws {
         try await withApp { app in
             try await app.test(
