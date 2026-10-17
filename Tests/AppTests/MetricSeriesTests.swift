@@ -380,6 +380,28 @@ final class MetricSeriesTests: XCTestCase {
         }
     }
 
+    func testScreenViewsCountByScreenAndVersion() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeScreen(name: "Feed", date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeScreen(name: "Feed", date: utcDate(2026, 6, 10, 15), appVersion: "3.2.0"),
+                    makeScreen(name: "Profile", date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeScreen(name: "Feed", date: utcDate(2026, 6, 10, 9), appVersion: "3.1.4"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "Screen", by: "version", source: "lifecycle",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            let totals = groups.map { "\($0.category ?? "-") \($0.version ?? "") \($0.points.first?.value.intValue ?? 0)" }
+            XCTAssertEqual(totals, ["Feed 3.1.4 1", "Feed 3.2.0 2", "Profile 3.2.0 1"])
+        }
+    }
+
     func testLifecycleCountsWithoutCategoryStayWhole() async throws {
         try await withApp { app in
             try await write(
