@@ -175,26 +175,9 @@ func makeMetric(type: String = "IntMetric", name: String, category: String, date
     )
 }
 
-func makeExit(reason: String, count: Int64, date: Date, appVersion: String) -> Record {
-    makeRecord(
-        type: "Exit",
-        fields: [
-            "category": .string(reason),
-            "app_version": .string(appVersion),
-            "date": .date(date),
-            "hour": .date(date.startOfHour),
-            "day": .date(date.startOfDay),
-            "week": .date(date.startOfWeek),
-            "month": .date(date.startOfMonth),
-            "value": .int(count),
-            "version": .int(1),
-        ]
-    )
-}
-
-func makePerformance(metric: String, bucket: String? = nil, value: Int64, date: Date, appVersion: String) -> Record {
+func makeDailyMetric(name: String, category: String? = nil, value: Int64, date: Date, appVersion: String) -> Record {
     var fields: [String: FieldValue] = [
-        "name": .string(metric),
+        "name": .string(name),
         "app_version": .string(appVersion),
         "date": .date(date),
         "hour": .date(date.startOfHour),
@@ -204,10 +187,10 @@ func makePerformance(metric: String, bucket: String? = nil, value: Int64, date: 
         "value": .int(value),
         "version": .int(1),
     ]
-    if let bucket {
-        fields["category"] = .string(bucket)
+    if let category {
+        fields["category"] = .string(category)
     }
-    return makeRecord(type: "Performance", fields: fields)
+    return makeRecord(type: "DailyMetric", fields: fields)
 }
 
 func write(_ records: [Record], to app: Application) async throws {
