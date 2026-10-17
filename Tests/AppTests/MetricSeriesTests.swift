@@ -9,22 +9,12 @@ import XCTVapor
 
 @testable import App
 
-/// `GET /metrics/series` folds raw records onto a single time axis, grouped
-/// by name: one sparse point per non-empty bucket, counts as `.int` and metric
-/// sums as `.double`. 2026-06-10 is a Wednesday; its week starts Sunday
-/// 2026-06-07.
-///
 final class MetricSeriesTests: XCTestCase {
-    /// The point value for `name` at `date`, or nil when that bucket is empty —
-    /// the series is sparse, so empty buckets carry no point.
-    ///
     func value(_ groups: [MetricSeriesGroup], _ name: String, _ date: Date) -> FieldValue? {
         let ms = Int64((date.timeIntervalSince1970 * 1000).rounded())
         return groups.first { $0.name == name }?.points.first { $0.date == ms }?.value
     }
 
-    /// The points of the one group named `name`, or an empty array when absent.
-    ///
     func points(_ groups: [MetricSeriesGroup], _ name: String) -> [MetricSeriesPoint] {
         groups.first { $0.name == name }?.points ?? []
     }
@@ -308,8 +298,6 @@ final class MetricSeriesTests: XCTestCase {
                 from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
             )
 
-            // Only the two custom "Session" events are counted; the Session
-            // lifecycle record no longer conflates into the total.
             XCTAssertEqual(groups.map(\.name), ["Session"])
             XCTAssertEqual(value(groups, "Session", utcDate(2026, 6, 10)), .int(2))
         }
@@ -331,8 +319,6 @@ final class MetricSeriesTests: XCTestCase {
                 from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
             )
 
-            // Only the two Session records are counted; the same-named custom
-            // event is excluded.
             XCTAssertEqual(value(groups, "Session", utcDate(2026, 6, 10)), .int(2))
         }
     }
@@ -353,7 +339,6 @@ final class MetricSeriesTests: XCTestCase {
                 from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
             )
 
-            // Only the IntMetric sums surface; the same-named event is excluded.
             XCTAssertEqual(value(groups, "requests", utcDate(2026, 6, 10)), .int(12))
         }
     }

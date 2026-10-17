@@ -9,7 +9,6 @@ import Fluent
 import Vapor
 
 struct RecordController: RouteCollection {
-    /// Largest accepted write batch; the Scout client chunks at 400.
     static let maxBatchSize = 1000
 
     func boot(routes: any RoutesBuilder) throws {
@@ -19,9 +18,6 @@ struct RecordController: RouteCollection {
         records.get(":recordName", use: lookup)
     }
 
-    /// Upserts a batch of records by `recordID` — re-sent records overwrite
-    /// their fields, so sync retries stay idempotent.
-    ///
     func write(req: Request) async throws -> WriteResponse {
         let body = try req.content.decode(WriteRequest.self)
 

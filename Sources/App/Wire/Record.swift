@@ -7,7 +7,6 @@
 
 import Vapor
 
-/// Wire representation of a single record.
 struct Record: Content, Equatable {
     let recordType: String
     let recordID: String
@@ -15,9 +14,6 @@ struct Record: Content, Equatable {
 }
 
 extension Record {
-    /// Restricts the payload to the requested fields. A `nil` list keeps
-    /// every field.
-    ///
     func keeping(fields desired: [String]?) -> Record {
         guard let desired else {
             return self

@@ -9,50 +9,19 @@ import Fluent
 import SQLKit
 import Vapor
 
-/// Builds a weekly retention-cohort table from raw `Install` and `Session`
-/// records.
-///
-/// Installs are grouped into acquisition cohorts by the UTC week of their
-/// install day. For each install and each milestone in `dayOffsets`, bounded
-/// day-N retention asks a single yes/no question: was the install active on
-/// exactly `install day + N`? A cohort's `retained[N]` is how many of its
-/// installs answered yes. Each cohort is also split into segments by the OS
-/// major version of the install's first session, and each segment counts the
-/// installs that crashed or hung soon after install. The result is served
-/// directly from `GET /api/v1/metrics/retention`.
-///
 enum RetentionService {
-    /// The record type that anchors a cohort: one per install, carrying the
-    /// install day.
-    ///
     static let installSource = "Install"
 
-    /// The record type that signals activity. Every app foreground creates a
-    /// Session, making it the return-visit heartbeat.
-    ///
     static let activitySource = "Session"
 
-    /// The incident record types a segment counts affected installs for.
     static let crashSource = "Crash"
     static let hangSource = "Hang"
 
-    /// Day-since-install milestones, in days, at which bounded retention is
-    /// reported. Must stay in lockstep with the client's
-    /// `RetentionCohort.dayOffsets`.
-    ///
+    // Keep in sync with the client's RetentionCohort.dayOffsets.
     static let dayOffsets = [0, 1, 3, 7, 14, 30]
 
-    /// Days after install within which a crash or hang marks an install as
-    /// affected: every day up to the last milestone.
-    ///
     static let horizon = (dayOffsets.last ?? 0) + 1
 
-    /// One weekly cohort per install week in the half-open `[from, to)` range,
-    /// each carrying its install count, the retained count at every milestone,
-    /// and its OS segments. A milestone that has not fully elapsed for the
-    /// whole cohort by `to` is reported as `nil`, leaving the cohort table's
-    /// triangular gap.
-    ///
     static func cohorts(from: Date, to: Date, on database: any Database) async throws -> [RetentionCohortPoint] {
         let rows = try await activity(from: from, to: to, on: database)
         let systems = try await systems(from: from, to: to, on: database)
@@ -116,11 +85,6 @@ enum RetentionService {
         }
     }
 
-    /// Each install in range paired with every distinct day it was active
-    /// within its first 30 days (offset 0…30). Installs with no activity still
-    /// appear once with a `nil` active day, so cohort sizes count every
-    /// acquired install, not just the returning ones.
-    ///
     private static func activity(from: Date, to: Date, on database: any Database) async throws -> [RetentionRow] {
         let sql = try database.sql()
 
@@ -160,9 +124,6 @@ enum RetentionService {
         let os: String
     }
 
-    /// The OS major version of each install's earliest session in range that
-    /// carries one, such as "iOS 18" for "iOS 18.2".
-    ///
     private static func systems(from: Date, to: Date, on database: any Database) async throws -> [String: String] {
         let sql = try database.sql()
 
@@ -192,9 +153,6 @@ enum RetentionService {
         let kind: String
     }
 
-    /// Every (install, incident type) pair where the install crashed or hung
-    /// within `horizon` days of its install day.
-    ///
     private static func incidents(from: Date, to: Date, on database: any Database) async throws -> Set<Incident> {
         let sql = try database.sql()
 
@@ -226,13 +184,11 @@ enum RetentionService {
     }
 }
 
-/// One install's day and the day offsets on which it was active.
 private struct InstallActivity {
     let day: Date
     var offsets: Set<Int> = []
 }
 
-/// The running counts of a cohort or a segment.
 private struct Tally {
     var size = 0
     var retained: [Int: Int] = [:]
@@ -254,9 +210,6 @@ private struct Tally {
         }
     }
 
-    /// The retained count at each milestone, or `nil` when the milestone has
-    /// not fully elapsed for the whole cohort week by `to`.
-    ///
     func cells(week: Date, to: Date) -> [Int?] {
         RetentionService.dayOffsets.enumerated().map { index, offset in
             let matured = Calendar.utc.date(byAdding: .day, value: 7 + offset, to: week)!

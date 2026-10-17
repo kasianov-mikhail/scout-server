@@ -8,14 +8,6 @@
 import Fluent
 import Vapor
 
-/// A stored analytics record.
-///
-/// The full typed payload lives in `payload`; the fields Scout queries or
-/// aggregates on are mirrored into dedicated columns so they can be
-/// filtered, sorted, and grouped in SQL. `hourEpoch`/`dayEpoch` duplicate
-/// the `hour`/`day` buckets as Unix seconds, giving aggregation queries a
-/// GROUP BY key that decodes identically on Postgres and SQLite.
-///
 final class RecordModel: Model, @unchecked Sendable {
     static let schema = "records"
 
@@ -103,7 +95,6 @@ extension RecordModel {
         apply(fields: record.fields)
     }
 
-    /// Replaces the payload and re-extracts the queryable columns.
     func apply(fields: [String: FieldValue]) {
         payload = fields
 
@@ -181,8 +172,7 @@ struct CreateRecord: AsyncMigration {
 }
 
 struct AddVersionFields: AsyncMigration {
-    // SQLite can't add two columns in one ALTER TABLE, so each field gets
-    // its own update.
+    // SQLite can't add two columns in one ALTER TABLE.
     func prepare(on database: any Database) async throws {
         try await database.schema(RecordModel.schema)
             .field("app_version", .string)
@@ -200,9 +190,6 @@ struct AddVersionFields: AsyncMigration {
     }
 }
 
-/// Adds the `os_version` column that retention segments group by, and fills
-/// it for the sessions stored before the column existed.
-///
 struct AddOSVersionField: AsyncMigration {
     func prepare(on database: any Database) async throws {
         try await database.schema(RecordModel.schema)

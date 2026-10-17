@@ -11,12 +11,6 @@ import XCTVapor
 
 let testAPIKey = "test-key"
 
-/// Boots an app against the test database, runs the test body, and shuts the
-/// app down even when the body throws.
-///
-/// The database is in-memory SQLite by default; setting `DATABASE_URL` points
-/// the suite at a real Postgres instead (see `configure`).
-///
 func withApp(_ body: (Application) async throws -> Void) async throws {
     let app = try await Application.make(.testing)
     do {
@@ -99,8 +93,6 @@ func makeSession(start: Date, installID: String, deviceID: String? = nil, sessio
 func makeVisit(date: Date, deviceID: String, installID: String = UUID().uuidString) -> Record {
     makeRecord(
         type: "Visit",
-        // The client names the marker after the device and day, so a re-sent
-        // marker overwrites its twin instead of counting twice.
         name: "\(deviceID)-\(Int64((date.startOfDay.timeIntervalSince1970 * 1000).rounded()))",
         fields: [
             "date": .date(date),

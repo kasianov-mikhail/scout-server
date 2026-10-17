@@ -7,11 +7,6 @@
 
 import Vapor
 
-/// The set of API keys the server accepts, parsed from `SCOUT_API_KEYS`.
-///
-/// An empty key set rejects every request except in the `.development`
-/// environment, where the API stays open for local experimentation.
-///
 struct APIKeys: Sendable {
     let keys: Set<String>
     let environment: Environment
@@ -46,7 +41,6 @@ extension Application {
     }
 }
 
-/// Authenticates requests by the `X-API-Key` header or a bearer token.
 struct APIKeyMiddleware: AsyncMiddleware {
     func respond(to request: Request, chainingTo next: any AsyncResponder) async throws -> Response {
         let key = request.headers.first(name: "X-API-Key") ?? request.headers.bearerAuthorization?.token

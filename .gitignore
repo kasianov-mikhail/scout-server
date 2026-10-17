@@ -3,3 +3,5 @@
 .swiftpm/
 DerivedData/
 .env
+.claude/*
+!.claude/CLAUDE.md

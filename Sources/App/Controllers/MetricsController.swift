@@ -8,12 +8,7 @@
 import Fluent
 import Vapor
 
-/// Serves pre-aggregated metric series natively: the server aggregates raw
-/// records and answers with finished series — the DAU/WAU/MAU active-user
-/// counts and a name-grouped, value-per-bucket series for a telemetry category.
-///
 struct MetricsController: RouteCollection {
-    /// Span used when the caller omits `from`: the trailing 90 days.
     static let defaultSpan: TimeInterval = 90 * 86_400
 
     func boot(routes: any RoutesBuilder) throws {
@@ -23,11 +18,6 @@ struct MetricsController: RouteCollection {
         metrics.get("series", use: series)
     }
 
-    /// `GET /metrics/active-users?from=<ms>&to=<ms>` — one DAU/WAU/MAU point per
-    /// UTC day over the half-open `[from, to)` range. Both bounds are
-    /// milliseconds since the Unix epoch; `to` defaults to now and `from` to
-    /// 90 days before `to`.
-    ///
     func activeUsers(req: Request) async throws -> ActiveUsersResponse {
         let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
         let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
@@ -40,11 +30,6 @@ struct MetricsController: RouteCollection {
         return ActiveUsersResponse(series: series)
     }
 
-    /// `GET /metrics/retention?from=<ms>&to=<ms>` — a weekly retention-cohort
-    /// table over the half-open `[from, to)` range of install weeks. Both
-    /// bounds are milliseconds since the Unix epoch; `to` defaults to now and
-    /// `from` to 90 days before `to`, like `activeUsers`.
-    ///
     func retention(req: Request) async throws -> RetentionResponse {
         let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
         let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
@@ -57,20 +42,6 @@ struct MetricsController: RouteCollection {
         return RetentionResponse(cohorts: cohorts)
     }
 
-    /// `GET /metrics/series?name=<name>&category=<cat>&values=int|double&bucket=hour|day|week&by=version&source=event|lifecycle|metric&reduce=sum|last&from=<ms>&to=<ms>`
-    /// — a name-grouped, value-per-bucket series for metric, event, or
-    /// lifecycle names. `name` and `category` are optional filters; omitting
-    /// both returns every series the raw records carry. `values` picks the
-    /// flavor (inferred when omitted), `bucket` defaults to `day`,
-    /// `by=version` splits the groups by app version, and the range defaults
-    /// to the trailing 90 days, like `activeUsers`. `source` pins the
-    /// namespace a `name` resolves against — an event, a lifecycle counter, or
-    /// a metric — so a name shared across namespaces isn't guessed; omitting it
-    /// keeps the original infer-from-name behavior. `reduce` picks how a bucket
-    /// folds its observations: `sum` accumulates (the default, for counters and
-    /// timers), while `last` keeps the newest value, which is what a gauge
-    /// needs; a `last` reduce spans metrics only and keeps zero readings.
-    ///
     func series(req: Request) async throws -> MetricSeriesResponse {
         let name = req.query[String.self, at: "name"].flatMap { $0.isEmpty ? nil : $0 }
         let category = req.query[String.self, at: "category"].flatMap { $0.isEmpty ? nil : $0 }

@@ -9,31 +9,9 @@ import Fluent
 import SQLKit
 import Vapor
 
-/// Computes a DAU/WAU/MAU time series from the raw records that signal
-/// activity.
-///
-/// The Scout client marks activity forward: a device active on day A counts
-/// as weekly-active for every day in `[A, A + 7 days)` and monthly-active
-/// for `[A, A + 30 days)`, summing 0/1 flags per device across all clients.
-/// The server mirrors that exact algorithm over the distinct (device, day)
-/// pairs derived from raw records and serves the result as a flat series
-/// from `GET /api/v1/metrics/active-users`.
-///
-/// Activity is counted per device, not per install, so reinstalling stays
-/// one active user rather than becoming two. Retention counts installs
-/// instead — a cohort is an acquisition, so `RetentionService` keys on
-/// `install_id`.
-///
 enum ActiveUserService {
-    /// The marker the client writes once per device per day: its explicit
-    /// activity heartbeat.
-    ///
     static let visitSource = "Visit"
 
-    /// Every app foreground creates a session, so sessions signal activity
-    /// too. The client counts both sources, and a device that produced
-    /// either on a day is active that day.
-    ///
     static let sessionSource = "Session"
 
     private enum Period: CaseIterable {
@@ -41,11 +19,6 @@ enum ActiveUserService {
         case weekly
         case monthly
 
-        /// The length of the trailing window, in days. The month is a fixed
-        /// 30 days rather than a calendar month, matching the client — a
-        /// calendar month would stretch and shrink the window with the
-        /// month's length.
-        ///
         var days: Int {
             switch self {
             case .daily: 1
@@ -55,12 +28,6 @@ enum ActiveUserService {
         }
     }
 
-    /// A flat DAU/WAU/MAU series — the aggregation-native shape the server
-    /// serves directly. One point per UTC day in
-    /// the half-open `[from, to)` range, each an as-of trailing distinct-device
-    /// count (1, 7, and 30 days). Zero-activity days are included so the
-    /// result is a dense, directly chartable series.
-    ///
     static func series(from: Date, to: Date, on database: any Database) async throws -> [ActiveUserPoint] {
         let active = try await activeDevices(in: from..<to, on: database)
 
@@ -82,12 +49,6 @@ enum ActiveUserService {
         return points
     }
 
-    /// For each period, the set of devices counted active on each day. A
-    /// device active on day A is marked forward across `[A, A + period)`, so
-    /// a day's set is exactly the distinct devices active in the trailing
-    /// window ending that day. Days at or after the range's upper bound are
-    /// skipped, matching the half-open query semantics.
-    ///
     private static func activeDevices(in range: Range<Date>, on database: any Database) async throws -> [Period: [Date: Set<String>]] {
         let pairs = try await activity(in: range, on: database)
 
@@ -117,9 +78,6 @@ enum ActiveUserService {
         let day: Int64
     }
 
-    /// Distinct (device, day) activity pairs. The lower bound backs off far
-    /// enough that a 30-day forward mark still reaches the range.
-    ///
     private static func activity(in range: Range<Date>, on database: any Database) async throws -> [ActivityPair] {
         let sql = try database.sql()
 

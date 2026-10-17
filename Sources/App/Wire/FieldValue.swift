@@ -7,13 +7,6 @@
 
 import Foundation
 
-/// A typed record field value, the wire format shared with the Scout client.
-///
-/// Encoded as a single-key JSON object, e.g. `{"string": "login"}` or
-/// `{"date": 1718000000000}`. Dates travel as integer milliseconds since
-/// the Unix epoch so equality survives the round trip; bytes travel as
-/// base64.
-///
 enum FieldValue: Equatable, Sendable {
     case string(String)
     case int(Int64)
