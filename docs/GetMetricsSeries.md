@@ -1,6 +1,6 @@
 # `GET /api/v1/metrics/series`
 
-A name-grouped, pre-aggregated value-per-bucket series: record counts for lifecycle types (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`, `Hang`, `ResourceException`) and event names, value sums for `IntMetric` / `DoubleMetric` names, first-crash-per-install counts under the `VersionCrash` pseudo-name, and `DailyMetric` value sums split by name and category. One group per name, so a single request can carry a whole telemetry category — or, with no filters at all, the entire record stream.
+A name-grouped, pre-aggregated value-per-bucket series: record counts for lifecycle types (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`, `Hang`, `ResourceException`, `Screen`) and event names, value sums for `IntMetric` / `DoubleMetric` names, first-crash-per-install counts under the `VersionCrash` pseudo-name, and `DailyMetric` value sums split by name and category. One group per name, so a single request can carry a whole telemetry category — or, with no filters at all, the entire record stream.
 
 | Parameter | Meaning |
 | --- | --- |
@@ -17,7 +17,7 @@ Both filters are optional and independent: `name` alone narrows to one series, `
 
 Each group carries one point per non-empty bucket over the range (empty buckets are omitted, so the series is sparse), each a typed `value` — `int` for counts and `IntMetric` sums, `double` for `DoubleMetric` sums. A `category` filter excludes lifecycle and event names, which carry no category. The range snaps down to the bucket containing `from`, so the first bucket is whole.
 
-`ResourceException` records carry their kind, such as `cpu` or `disk_write`, in `category`. Their counts keep one group per kind, and `category` narrows them to one kind when `source=lifecycle` is set. Lifecycle records without a category stay one group per name.
+`ResourceException` records carry their kind, such as `cpu` or `disk_write`, in `category`. Their counts keep one group per kind, and `category` narrows them to one kind when `source=lifecycle` is set. `Screen` records carry the screen name, such as `Feed`, in `category` the same way, so their counts are screen views per screen. Lifecycle records without a category stay one group per name.
 
 `DailyMetric` records each carry a day's MetricKit reading for one name: `category` holds the exit reason or histogram bucket (absent for a plain total), and `value` the integer count or total. Unlike other lifecycle records, their series take the group name from the record, such as `exit` or `launch_time`, and keep one group per category. The series sums `value`, so counts from many devices add up, and `category` narrows a name to one category when `source=lifecycle` is set.
 

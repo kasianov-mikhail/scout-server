@@ -146,6 +146,12 @@ func makeResourceException(kind: String, date: Date, appVersion: String) -> Reco
     return record
 }
 
+func makeScreen(name: String, date: Date, appVersion: String) -> Record {
+    var record = makeIncident(type: "Screen", date: date, appVersion: appVersion)
+    record.fields["category"] = .string(name)
+    return record
+}
+
 func makeInstall(date: Date, installID: String) -> Record {
     makeRecord(
         type: "Install",

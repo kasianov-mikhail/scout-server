@@ -20,7 +20,7 @@ import Vapor
 ///
 enum MetricSeriesService {
     /// Lifecycle record types counted under their own name.
-    static let lifecycleTypes = ["Crash", "Device", "Hang", "Install", "Launch", "ResourceException", "Session", "Version"]
+    static let lifecycleTypes = ["Crash", "Device", "Hang", "Install", "Launch", "ResourceException", "Screen", "Session", "Version"]
 
     /// The first `Crash` of each (install, app version) pair within the
     /// range — the crashed-installs series behind release health.
