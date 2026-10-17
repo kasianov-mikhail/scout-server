@@ -192,6 +192,24 @@ func makeExit(reason: String, count: Int64, date: Date, appVersion: String) -> R
     )
 }
 
+func makePerformance(metric: String, bucket: String? = nil, value: Int64, date: Date, appVersion: String) -> Record {
+    var fields: [String: FieldValue] = [
+        "name": .string(metric),
+        "app_version": .string(appVersion),
+        "date": .date(date),
+        "hour": .date(date.startOfHour),
+        "day": .date(date.startOfDay),
+        "week": .date(date.startOfWeek),
+        "month": .date(date.startOfMonth),
+        "value": .int(value),
+        "version": .int(1),
+    ]
+    if let bucket {
+        fields["category"] = .string(bucket)
+    }
+    return makeRecord(type: "Performance", fields: fields)
+}
+
 func write(_ records: [Record], to app: Application) async throws {
     try await app.test(
         .POST, "api/v1/records",
