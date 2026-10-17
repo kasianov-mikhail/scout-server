@@ -1,6 +1,6 @@
 # `GET /api/v1/metrics/series`
 
-A name-grouped, pre-aggregated value-per-bucket series: record counts for lifecycle types (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`, `Hang`) and event names, value sums for `IntMetric` / `DoubleMetric` names, and first-crash-per-install counts under the `VersionCrash` pseudo-name. One group per name, so a single request can carry a whole telemetry category — or, with no filters at all, the entire record stream.
+A name-grouped, pre-aggregated value-per-bucket series: record counts for lifecycle types (`Device`, `Install`, `Launch`, `Session`, `Version`, `Crash`, `Hang`) and event names, value sums for `IntMetric` / `DoubleMetric` names, first-crash-per-install counts under the `VersionCrash` pseudo-name, and `Exit` value sums split by exit reason. One group per name, so a single request can carry a whole telemetry category — or, with no filters at all, the entire record stream.
 
 | Parameter | Meaning |
 | --- | --- |
@@ -16,6 +16,8 @@ A name-grouped, pre-aggregated value-per-bucket series: record counts for lifecy
 Both filters are optional and independent: `name` alone narrows to one series, `category` alone returns a whole telemetry category, and omitting both returns every series the raw records carry — which is how the client fills its log and search surfaces.
 
 Each group carries one point per non-empty bucket over the range (empty buckets are omitted, so the series is sparse), each a typed `value` — `int` for counts and `IntMetric` sums, `double` for `DoubleMetric` sums. A `category` filter excludes lifecycle and event names, which carry no category. The range snaps down to the bucket containing `from`, so the first bucket is whole.
+
+`Exit` is a lifecycle name whose records each carry a day's count of app exits for one reason: the `category` field holds the reason and `value` the count. Its series sums `value` instead of counting records and keeps one group per reason, so `category` narrows it to one reason when `source=lifecycle` is set.
 
 A `reduce=last` request spans metric records only, since record counts have no "latest" value, and it keeps zero readings rather than dropping them — zero is a legitimate gauge value. Records without a `date` carry no ordering and so are never the latest.
 

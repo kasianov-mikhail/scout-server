@@ -27,6 +27,8 @@ enum MetricSeriesService {
     ///
     static let versionCrashName = "VersionCrash"
 
+    static let exitType = "Exit"
+
     /// Raw metric record types clients upload; the server sums their values.
     static let intMetricType = "IntMetric"
     static let doubleMetricType = "DoubleMetric"
@@ -146,7 +148,8 @@ enum MetricSeriesService {
     }
 
     /// Per-hour lifecycle-type record counts plus the `VersionCrash`
-    /// first-crash counts, honoring the name constraint.
+    /// first-crash counts and the `Exit` value sums, honoring the name
+    /// constraint.
     ///
     private static func lifecycleRows(_ constraints: Constraints, on database: any Database) async throws -> [HourRow] {
         var rows: [HourRow] = []
@@ -155,6 +158,9 @@ enum MetricSeriesService {
         }
         if constraints.name == nil || constraints.name == versionCrashName {
             rows += try await firstCrashRows(constraints, on: database)
+        }
+        if constraints.name == nil || constraints.name == exitType {
+            rows += try await exitRows(constraints, on: database)
         }
         return rows
     }
@@ -233,6 +239,27 @@ enum MetricSeriesService {
         ).all(decoding: HourRow.self).map { row in
             var row = row
             row.name = versionCrashName
+            return row
+        }
+
+        return rows.filter(constraints.matches)
+    }
+
+    private static func exitRows(_ constraints: Constraints, on database: any Database) async throws -> [HourRow] {
+        let sql = try database.sql()
+        let range = constraints.hourRange
+
+        let rows = try await sql.raw(
+            """
+            SELECT category, app_version, hour_epoch AS hour, CAST(SUM(value_int) AS BIGINT) AS total_int
+            FROM records
+            WHERE record_type = \(bind: exitType)
+              AND hour_epoch >= \(bind: range.lowerBound) AND hour_epoch < \(bind: range.upperBound)
+            GROUP BY category, app_version, hour_epoch
+            """
+        ).all(decoding: HourRow.self).map { row in
+            var row = row
+            row.name = exitType
             return row
         }
 
