@@ -9,55 +9,24 @@ import Fluent
 import SQLKit
 import Vapor
 
-/// Computes name-grouped, value-per-bucket series natively from raw records.
-///
-/// Clients upload only raw records; GROUP BY aggregation folds them into
-/// hourly rows — record counts for lifecycle and event names, `IntMetric` /
-/// `DoubleMetric` value sums for metric names — which are rolled up into the
-/// requested granularity and grouped by name. One request can carry a whole
-/// telemetry category, or the entire record stream when both filters are
-/// omitted.
-///
 enum MetricSeriesService {
-    /// Lifecycle record types counted under their own name.
     static let lifecycleTypes = ["Crash", "Device", "Hang", "Install", "Launch", "ResourceException", "Screen", "Session", "Version"]
 
-    /// The first `Crash` of each (install, app version) pair within the
-    /// range — the crashed-installs series behind release health.
-    ///
     static let versionCrashName = "VersionCrash"
 
-    /// Daily MetricKit readings, such as exit counts per reason or launch
-    /// time histogram buckets. Their series take the name from the record
-    /// instead of the record type.
-    ///
     static let dailyMetricType = "DailyMetric"
 
-    /// Raw metric record types clients upload; the server sums their values.
     static let intMetricType = "IntMetric"
     static let doubleMetricType = "DoubleMetric"
 
-    /// Which namespace a `name` resolves against. Absent, the server infers it
-    /// from the name — counting a lifecycle type and any same-named event into
-    /// one group. An explicit source keeps the two namespaces apart, so a
-    /// custom event named like a lifecycle counter (e.g. "Session") is neither
-    /// shadowed nor conflated.
-    ///
     enum Source: String {
         case event, lifecycle, metric
     }
 
-    /// How a bucket folds the observations inside it. `sum` accumulates, which
-    /// suits counters and timers; `last` keeps the newest observation, which is
-    /// what a gauge — a point-in-time value — needs.
-    ///
     enum Reduce: String {
         case sum, last
     }
 
-    /// The granularity of a series point. `week` starts on Sunday, matching
-    /// the rest of the date bucketing.
-    ///
     enum Bucket: String {
         case hour
         case day
@@ -72,18 +41,6 @@ enum MetricSeriesService {
         }
     }
 
-    /// One group per name over the half-open `[from, to)` range, each a sparse
-    /// list of `bucket`-aligned points. `name` and `category` narrow the
-    /// result; omitting both returns every series the raw records carry.
-    /// `values` picks the flavor — `int` for counts and `IntMetric` sums,
-    /// `double` for `DoubleMetric` sums — and is inferred per name when
-    /// omitted, the integer side winning a collision. `byVersion` splits the
-    /// groups by the records' `app_version`.
-    ///
-    /// Empty buckets are dropped, so every point is a real observation and a
-    /// year-wide category stays compact. The range snaps down to the bucket
-    /// containing `from`, so the first bucket is whole.
-    ///
     static func series(name: String?, category: String?, values: String?, bucket: Bucket, byVersion: Bool, source: Source?, reduce: Reduce = .sum, from: Date, to: Date, on database: any Database) async throws -> [MetricSeriesGroup] {
         let constraints = Constraints(name: name, category: category, dateRange: bucket.start(of: from)..<to)
 
@@ -121,14 +78,9 @@ enum MetricSeriesService {
         return groups.sorted { ($0.name, $0.category ?? "", $0.version ?? "") < ($1.name, $1.category ?? "", $1.version ?? "") }
     }
 
-    /// Hourly integer rows: lifecycle and event record counts, first-crash
-    /// counts for `VersionCrash`, and `IntMetric` value sums, honoring the
-    /// name/category constraints.
-    ///
     private static func intRows(_ constraints: Constraints, source: Source?, reduce: Reduce, on database: any Database) async throws -> [HourRow] {
         var rows: [HourRow] = []
 
-        // Record counts have no "latest" value, so a last reduce only spans metrics.
         guard reduce == .sum else {
             return try await lastRows(recordType: intMetricType, constraints: constraints, on: database)
         }
@@ -151,10 +103,6 @@ enum MetricSeriesService {
         return rows
     }
 
-    /// Per-hour lifecycle-type record counts plus the `VersionCrash`
-    /// first-crash counts and the `DailyMetric` value sums, honoring the
-    /// name constraint.
-    ///
     private static func lifecycleRows(_ constraints: Constraints, on database: any Database) async throws -> [HourRow] {
         var rows: [HourRow] = []
         for type in lifecycleTypes where constraints.name == nil || constraints.name == type {
@@ -167,9 +115,6 @@ enum MetricSeriesService {
         return rows
     }
 
-    /// Hourly double rows: `DoubleMetric` value sums. Only the metric-bearing
-    /// sources carry them; an explicit event or lifecycle source has none.
-    ///
     private static func doubleRows(_ constraints: Constraints, source: Source?, reduce: Reduce, on database: any Database) async throws -> [HourRow] {
         switch source {
         case .event, .lifecycle:
@@ -181,10 +126,6 @@ enum MetricSeriesService {
         }
     }
 
-    /// Per-hour record counts; `named` overrides the series name for
-    /// lifecycle types, which split by `category` when their records carry
-    /// one, and events group by their own `name` column.
-    ///
     private static func countRows(recordType: String, named: String?, constraints: Constraints, on database: any Database) async throws -> [HourRow] {
         let sql = try database.sql()
         let range = constraints.hourRange
@@ -219,10 +160,6 @@ enum MetricSeriesService {
         return rows.filter(constraints.matches)
     }
 
-    /// Per-hour counts of each (install, app version) pair's first `Crash`
-    /// within the range. Installs without an id collapse into one pair per
-    /// version, matching the client-side aggregation.
-    ///
     private static func firstCrashRows(_ constraints: Constraints, on database: any Database) async throws -> [HourRow] {
         let sql = try database.sql()
         let range = constraints.hourRange
@@ -248,9 +185,6 @@ enum MetricSeriesService {
         return rows.filter(constraints.matches)
     }
 
-    /// Per-hour `DailyMetric` value sums, grouped by the metric name, the
-    /// category, and the app version.
-    ///
     private static func dailyMetricRows(_ constraints: Constraints, on database: any Database) async throws -> [HourRow] {
         let sql = try database.sql()
         let range = constraints.hourRange
@@ -268,9 +202,6 @@ enum MetricSeriesService {
         return rows.filter(constraints.matches)
     }
 
-    /// Per-hour metric value sums, grouped by metric name and telemetry
-    /// category.
-    ///
     private static func sumRows(recordType: String, constraints: Constraints, on database: any Database) async throws -> [HourRow] {
         let sql = try database.sql()
         let range = constraints.hourRange
@@ -293,10 +224,6 @@ enum MetricSeriesService {
         return rows.filter(constraints.matches)
     }
 
-    /// The newest value in each hour, per metric name and telemetry category —
-    /// the gauge counterpart of `sumRows`. Rows without a date carry no
-    /// ordering, so they cannot be "latest" and are skipped.
-    ///
     private static func lastRows(recordType: String, constraints: Constraints, on database: any Database) async throws -> [HourRow] {
         let sql = try database.sql()
         let range = constraints.hourRange
@@ -322,11 +249,6 @@ enum MetricSeriesService {
         return rows.filter(constraints.matches)
     }
 
-    /// Folds the hourly rows into the requested granularity, keyed by name,
-    /// category, bucket start, and — when `byVersion` — app version. A `sum`
-    /// reduce accumulates; a `last` reduce keeps the value of the newest hour
-    /// in each bucket.
-    ///
     private static func fold<T: AdditiveArithmetic & Equatable>(_ rows: [HourRow], bucket: Bucket, byVersion: Bool, reduce: Reduce, value: (HourRow) -> T) -> [GroupKey: [Date: T]] {
         var totals: [GroupKey: [Date: T]] = [:]
         var latestHour: [GroupKey: [Date: Int64]] = [:]
@@ -353,10 +275,6 @@ enum MetricSeriesService {
         return totals
     }
 
-    /// The buckets of one group as wire points, sorted by date. A `sum` reduce
-    /// drops empty buckets so a year-wide category stays compact; a `last`
-    /// reduce keeps zeros, since zero is a legitimate gauge reading.
-    ///
     private static func points<T: AdditiveArithmetic & Equatable>(_ totals: [Date: T], reduce: Reduce, value: (T) -> FieldValue) -> [MetricSeriesPoint] {
         totals
             .filter { reduce == .last || $0.value != .zero }
@@ -365,9 +283,6 @@ enum MetricSeriesService {
     }
 }
 
-/// One GROUP BY row: a (name, category, app version, hour bucket) and its
-/// aggregate.
-///
 private struct HourRow: Decodable {
     var name: String?
     var category: String?
@@ -384,15 +299,11 @@ private struct HourRow: Decodable {
     }
 }
 
-/// The narrowing a series request carries: a half-open date range plus
-/// optional `name` and `category` equality.
-///
 private struct Constraints {
     let name: String?
     let category: String?
     let dateRange: Range<Date>
 
-    /// SQL prefilter on hour buckets: hours starting inside the date range.
     var hourRange: Range<Int64> {
         Int64(dateRange.lowerBound.timeIntervalSince1970)..<Int64(dateRange.upperBound.timeIntervalSince1970)
     }
@@ -408,7 +319,6 @@ private struct Constraints {
     }
 }
 
-/// A (name, category, app version) series identity.
 private struct GroupKey: Hashable {
     let name: String
     let category: String?

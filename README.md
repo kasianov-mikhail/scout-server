@@ -43,7 +43,7 @@ Migrations run automatically on boot.
 
 ## API
 
-The server exposes a small HTTP API under `/api/v1` for uploading and querying records. See [API.md](API.md) for the full reference.
+The server exposes a small HTTP API under `/api/v1` for uploading and querying records.
 
 ## Development
 

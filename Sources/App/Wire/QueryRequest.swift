@@ -7,11 +7,6 @@
 
 import Vapor
 
-/// A record query against the server's records.
-///
-/// Either `recordType` (a fresh query) or `cursor` (continuation of a
-/// previous one) must be present.
-///
 struct QueryRequest: Content, Equatable {
     var recordType: String?
     var filters: [QueryFilter]?
@@ -21,7 +16,6 @@ struct QueryRequest: Content, Equatable {
     var cursor: String?
 }
 
-/// A single comparison against a queryable record field.
 struct QueryFilter: Codable, Equatable, Sendable {
     enum Operator: String, Codable, Sendable {
         case equals

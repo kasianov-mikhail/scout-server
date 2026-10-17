@@ -9,11 +9,6 @@ import XCTVapor
 
 @testable import App
 
-/// The native `/metrics/active-users` series is the flat DAU/WAU/MAU shape
-/// the server serves directly. Each point is an as-of trailing distinct-device
-/// count over the 1, 7, and 30 days ending that UTC day, with zero-activity
-/// days included.
-///
 final class ActiveUserSeriesTests: XCTestCase {
     func point(_ series: [ActiveUserPoint], _ date: Date) -> ActiveUserPoint? {
         let ms = Int64((date.timeIntervalSince1970 * 1000).rounded())
@@ -61,17 +56,11 @@ final class ActiveUserSeriesTests: XCTestCase {
 
             XCTAssertEqual(point(series, utcDate(2026, 6, 1))?.dau, 0)
             XCTAssertEqual(point(series, utcDate(2026, 6, 1))?.wau, 0)
-            // May 25 plus the 29 following days is June 23, the last day the
-            // 30-day window still holds that session.
             XCTAssertEqual(point(series, utcDate(2026, 6, 23))?.mau, 1)
             XCTAssertEqual(point(series, utcDate(2026, 6, 24))?.mau, 0)
         }
     }
 
-    /// The monthly window is a fixed 30 days, as on the client. A calendar
-    /// month would run 31 days out of January and 28 out of February, so the
-    /// same activity would age differently depending on when it happened.
-    ///
     func testMonthlyWindowIsThirtyDaysWhateverTheMonth() async throws {
         try await withApp { app in
             try await write(
@@ -92,10 +81,6 @@ final class ActiveUserSeriesTests: XCTestCase {
         }
     }
 
-    /// A `Visit` is the marker the client writes once per device per day
-    /// precisely to signal activity, so it counts on its own — a device that
-    /// produced one but no session is still active.
-    ///
     func testVisitMarkerCountsAsActivity() async throws {
         try await withApp { app in
             try await write([makeVisit(date: utcDate(2026, 6, 10, 9), deviceID: "a")], to: app)
@@ -107,9 +92,6 @@ final class ActiveUserSeriesTests: XCTestCase {
         }
     }
 
-    /// The two sources describe the same device on the same day, so it counts
-    /// once rather than twice.
-    ///
     func testVisitAndSessionOfOneDeviceCountOnce() async throws {
         try await withApp { app in
             try await write(
@@ -126,9 +108,6 @@ final class ActiveUserSeriesTests: XCTestCase {
         }
     }
 
-    /// Users are counted per device, so reinstalling — a second install id on
-    /// the same device — stays one active user.
-    ///
     func testReinstallOnOneDeviceIsOneUser() async throws {
         try await withApp { app in
             try await write(

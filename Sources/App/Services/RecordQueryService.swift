@@ -8,12 +8,10 @@
 import Fluent
 import Vapor
 
-/// Executes record queries against the generic `records` table.
 enum RecordQueryService {
     static let defaultLimit = 200
     static let maxLimit = 1000
 
-    /// Fields a query may filter or sort on; each maps to a dedicated column.
     static let queryableFields: Set<String> = [
         "name", "category", "level", "uuid",
         "device_id", "install_id", "launch_id", "session_id",

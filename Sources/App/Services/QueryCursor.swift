@@ -8,10 +8,6 @@
 import Foundation
 import Vapor
 
-/// A stateless pagination cursor: the original query plus the next offset,
-/// base64-encoded. The client treats it as an opaque token, so the query
-/// can be replayed without any server-side cursor storage.
-///
 struct QueryCursor: Codable, Equatable {
     let query: QueryRequest
     let offset: Int

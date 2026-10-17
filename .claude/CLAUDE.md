@@ -4,7 +4,7 @@
 
 # Scout client contract
 
-scout-server and the scout client app (`kasianov-mikhail/scout`) share an HTTP wire-format contract, so changes to the two repos are often interrelated: a change to request/response shapes, field names, the queryable-field set, or endpoints here (the `Wire` types, the controllers, and `API.md`) usually needs a matching change in scout's `Core/Database/Backend` layer (`HTTPQueryCoding`/`HTTPRecordCoding`/`HTTPDatabase`), and vice versa. They are separate repos, so a contract change normally ships as a PR in each — link the matching PR in the other repo from both descriptions. scout's `ServerContractTests` boots this server and runs against it (via scout's `Server` workflow), so a wire-format change here can break scout's CI — keep `API.md` and that test in sync.
+scout-server and the scout client app (`kasianov-mikhail/scout`) share an HTTP wire-format contract, so changes to the two repos are often interrelated: a change to request/response shapes, field names, the queryable-field set, or endpoints here (the `Wire` types and the controllers) usually needs a matching change in scout's `Core/Database/Backend` layer (`HTTPQueryCoding`/`HTTPRecordCoding`/`HTTPDatabase`), and vice versa. They are separate repos, so a contract change normally ships as a PR in each — link the matching PR in the other repo from both descriptions. scout's `ServerContractTests` boots this server and runs against it (via scout's `Server` workflow), so a wire-format change here can break scout's CI — keep that test in sync.
 
 # Initializer assignments
 

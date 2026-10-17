@@ -11,20 +11,8 @@ import XCTVapor
 
 @testable import App
 
-/// Guards against schema drift between a model and its migration.
-///
-/// Fluent never links a model's `@Field`s to the `.field(...)` calls in its
-/// migration: adding a property without a matching migration compiles, passes
-/// any test that doesn't touch the new column, and only fails at runtime once a
-/// row is written. This test boots the app (running every migration, exactly as
-/// `withApp` does), then asserts the columns a model declares match the columns
-/// the migrations actually created — turning a forgotten migration into a red
-/// CI run instead. It introspects whichever database backs the run, so it holds
-/// on both the fast SQLite suite and the Postgres CI job.
 final class SchemaConsistencyTests: XCTestCase {
 
-    /// Every model whose columns a migration is expected to cover. Add new
-    /// models here so they are held to the same check.
     static let models: [(schema: String, keys: [FieldKey])] = [
         (RecordModel.schema, RecordModel.keys)
     ]
@@ -50,9 +38,6 @@ final class SchemaConsistencyTests: XCTestCase {
         }
     }
 
-    /// The names of the columns that physically exist in `table`, read through
-    /// each backend's own catalog: `PRAGMA` on SQLite, `information_schema` on
-    /// Postgres.
     private static func columns(of table: String, in sql: any SQLDatabase) async throws -> Set<String> {
         if sql.dialect.name == "sqlite" {
             let rows = try await sql.raw("PRAGMA table_info(\(unsafeRaw: table))").all()

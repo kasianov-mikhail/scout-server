@@ -5,9 +5,7 @@ let package = Package(
     name: "scout-server",
     platforms: [
         .macOS(.v14),
-        // The server only runs on macOS/Linux, but it shares an Xcode workspace
-        // with the iOS client. Declare an iOS floor matching Vapor/Fluent's
-        // minimum so Xcode doesn't try to build it for iOS 12.0 and fail.
+        // Vapor's iOS floor, so the shared Xcode workspace doesn't build this for iOS 12.
         .iOS(.v13),
     ],
     dependencies: [

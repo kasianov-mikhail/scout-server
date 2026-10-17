@@ -7,19 +7,10 @@
 
 import Vapor
 
-/// The native active-user series the server aggregates from raw records and
-/// serves directly.
-///
 struct ActiveUsersResponse: Content, Equatable {
     let series: [ActiveUserPoint]
 }
 
-/// One day of the series: distinct active devices as of `date`, counted over
-/// the trailing day (`dau`), 7 days (`wau`), and 30 days (`mau`).
-///
-/// `date` is milliseconds since the Unix epoch at UTC midnight, matching the
-/// rest of the wire format.
-///
 struct ActiveUserPoint: Content, Equatable {
     let date: Int64
     let dau: Int

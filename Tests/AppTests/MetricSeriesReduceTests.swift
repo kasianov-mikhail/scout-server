@@ -9,9 +9,6 @@ import XCTVapor
 
 @testable import App
 
-/// `reduce=last` folds a bucket to its newest observation instead of summing,
-/// which is what a gauge needs. 2026-06-10 is a Wednesday.
-///
 final class MetricSeriesReduceTests: XCTestCase {
     private func value(_ groups: [MetricSeriesGroup], _ name: String, _ date: Date) -> FieldValue? {
         let ms = Int64((date.timeIntervalSince1970 * 1000).rounded())

@@ -9,12 +9,6 @@ import XCTVapor
 
 @testable import App
 
-/// The native `/metrics/retention` table groups installs into weekly
-/// acquisition cohorts and reports bounded day-N retention: for each milestone
-/// in `RetentionService.dayOffsets`, how many of a cohort's installs were
-/// active on exactly `install day + N`. Milestones that have not fully elapsed
-/// for a cohort come back `nil`.
-///
 final class RetentionSeriesTests: XCTestCase {
     func cohort(_ cohorts: [RetentionCohortPoint], week: Date) -> RetentionCohortPoint? {
         let ms = Int64((week.timeIntervalSince1970 * 1000).rounded())
@@ -36,11 +30,9 @@ final class RetentionSeriesTests: XCTestCase {
                 [
                     makeInstall(date: installDay, installID: "a"),
                     makeInstall(date: installDay, installID: "b"),
-                    // Install "a" returns on D0, D1, D7.
                     makeSession(start: installDay.addingTimeInterval(3600), installID: "a"),
                     makeSession(start: utcDate(2026, 6, 2, 10), installID: "a"),
                     makeSession(start: utcDate(2026, 6, 8, 9), installID: "a"),
-                    // Install "b" only opens on D0.
                     makeSession(start: installDay.addingTimeInterval(7200), installID: "b"),
                 ],
                 to: app
@@ -67,7 +59,6 @@ final class RetentionSeriesTests: XCTestCase {
                 [
                     makeInstall(date: installDay, installID: "a"),
                     makeSession(start: installDay.addingTimeInterval(3600), installID: "a"),
-                    // Install "b" never opens the app again.
                     makeInstall(date: installDay, installID: "b"),
                 ],
                 to: app
@@ -116,9 +107,6 @@ final class RetentionSeriesTests: XCTestCase {
             let week = installDay.startOfWeek
             let from = utcDate(2026, 5, 1)
 
-            // Day-0 stays nil until the whole cohort week plus the offset has
-            // fully elapsed (week + 7 + 0 days), not merely the last install's
-            // day-0 calendar day.
             let atBoundary = try await retention(from: from, to: week.addingTimeInterval(7 * 86_400), on: app)
             XCTAssertNil(retained(try XCTUnwrap(cohort(atBoundary, week: week)), offset: 0))
 
