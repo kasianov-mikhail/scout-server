@@ -74,7 +74,7 @@ func makeEvent(name: String, date: Date, level: String = "info", sessionID: Stri
     )
 }
 
-func makeSession(start: Date, installID: String, deviceID: String? = nil, sessionID: String = UUID().uuidString, appVersion: String? = nil) -> Record {
+func makeSession(start: Date, installID: String, deviceID: String? = nil, sessionID: String = UUID().uuidString, appVersion: String? = nil, osVersion: String? = nil) -> Record {
     var fields: [String: FieldValue] = [
         "start_date": .date(start),
         "session_id": .string(sessionID),
@@ -89,6 +89,9 @@ func makeSession(start: Date, installID: String, deviceID: String? = nil, sessio
     ]
     if let appVersion {
         fields["app_version"] = .string(appVersion)
+    }
+    if let osVersion {
+        fields["os_version"] = .string(osVersion)
     }
     return makeRecord(type: "Session", name: sessionID, fields: fields)
 }
