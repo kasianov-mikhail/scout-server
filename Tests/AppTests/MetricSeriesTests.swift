@@ -358,6 +358,48 @@ final class MetricSeriesTests: XCTestCase {
         }
     }
 
+    func testExitSumsSplitByReasonAndVersion() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeExit(reason: "watchdog", count: 2, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeExit(reason: "watchdog", count: 3, date: utcDate(2026, 6, 10, 15), appVersion: "3.2.0"),
+                    makeExit(reason: "normal", count: 40, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeExit(reason: "watchdog", count: 1, date: utcDate(2026, 6, 10, 9), appVersion: "3.1.4"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "Exit", by: "version", source: "lifecycle",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            let totals = groups.map { "\($0.category ?? "") \($0.version ?? "") \($0.points.first?.value.intValue ?? 0)" }
+            XCTAssertEqual(totals, ["normal 3.2.0 40", "watchdog 3.1.4 1", "watchdog 3.2.0 5"])
+        }
+    }
+
+    func testExitCategoryNarrowsToOneReason() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeExit(reason: "watchdog", count: 2, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeExit(reason: "normal", count: 40, date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "Exit", category: "watchdog", source: "lifecycle",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            XCTAssertEqual(groups.map(\.category), ["watchdog"])
+            XCTAssertEqual(value(groups, "Exit", utcDate(2026, 6, 10)), .int(2))
+        }
+    }
+
     func testUnknownSourceIsRejected() async throws {
         try await withApp { app in
             try await app.test(

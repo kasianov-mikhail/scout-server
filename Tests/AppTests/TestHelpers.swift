@@ -175,6 +175,23 @@ func makeMetric(type: String = "IntMetric", name: String, category: String, date
     )
 }
 
+func makeExit(reason: String, count: Int64, date: Date, appVersion: String) -> Record {
+    makeRecord(
+        type: "Exit",
+        fields: [
+            "category": .string(reason),
+            "app_version": .string(appVersion),
+            "date": .date(date),
+            "hour": .date(date.startOfHour),
+            "day": .date(date.startOfDay),
+            "week": .date(date.startOfWeek),
+            "month": .date(date.startOfMonth),
+            "value": .int(count),
+            "version": .int(1),
+        ]
+    )
+}
+
 func write(_ records: [Record], to app: Application) async throws {
     try await app.test(
         .POST, "api/v1/records",
