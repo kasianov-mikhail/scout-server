@@ -20,7 +20,7 @@ import Vapor
 ///
 enum MetricSeriesService {
     /// Lifecycle record types counted under their own name.
-    static let lifecycleTypes = ["Crash", "Device", "Hang", "Install", "Launch", "Session", "Version"]
+    static let lifecycleTypes = ["Crash", "Device", "Hang", "Install", "Launch", "ResourceException", "Session", "Version"]
 
     /// The first `Crash` of each (install, app version) pair within the
     /// range — the crashed-installs series behind release health.
@@ -182,7 +182,8 @@ enum MetricSeriesService {
     }
 
     /// Per-hour record counts; `named` overrides the series name for
-    /// lifecycle types, events group by their own `name` column.
+    /// lifecycle types, which split by `category` when their records carry
+    /// one, and events group by their own `name` column.
     ///
     private static func countRows(recordType: String, named: String?, constraints: Constraints, on database: any Database) async throws -> [HourRow] {
         let sql = try database.sql()
@@ -192,11 +193,11 @@ enum MetricSeriesService {
         if let named {
             rows = try await sql.raw(
                 """
-                SELECT app_version, hour_epoch AS hour, COUNT(*) AS total_int
+                SELECT category, app_version, hour_epoch AS hour, COUNT(*) AS total_int
                 FROM records
                 WHERE record_type = \(bind: recordType)
                   AND hour_epoch >= \(bind: range.lowerBound) AND hour_epoch < \(bind: range.upperBound)
-                GROUP BY app_version, hour_epoch
+                GROUP BY category, app_version, hour_epoch
                 """
             ).all(decoding: HourRow.self).map { row in
                 var row = row

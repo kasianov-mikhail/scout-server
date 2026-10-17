@@ -358,6 +358,48 @@ final class MetricSeriesTests: XCTestCase {
         }
     }
 
+    func testResourceExceptionsCountByKindAndVersion() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeResourceException(kind: "cpu", date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeResourceException(kind: "cpu", date: utcDate(2026, 6, 10, 15), appVersion: "3.2.0"),
+                    makeResourceException(kind: "disk_write", date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeResourceException(kind: "cpu", date: utcDate(2026, 6, 10, 9), appVersion: "3.1.4"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "ResourceException", by: "version", source: "lifecycle",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            let totals = groups.map { "\($0.category ?? "-") \($0.version ?? "") \($0.points.first?.value.intValue ?? 0)" }
+            XCTAssertEqual(totals, ["cpu 3.1.4 1", "cpu 3.2.0 2", "disk_write 3.2.0 1"])
+        }
+    }
+
+    func testLifecycleCountsWithoutCategoryStayWhole() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeCrash(date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeCrash(date: utcDate(2026, 6, 10, 15), appVersion: "3.2.0"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "Crash", by: "version", source: "lifecycle",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            XCTAssertEqual(groups.map(\.category), [nil])
+            XCTAssertEqual(value(groups, "Crash", utcDate(2026, 6, 10)), .int(2))
+        }
+    }
+
     func testDailyMetricCategoryNarrowsToOneCategory() async throws {
         try await withApp { app in
             try await write(

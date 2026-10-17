@@ -140,6 +140,12 @@ func makeHang(date: Date, installID: String? = nil, appVersion: String? = nil) -
     makeIncident(type: "Hang", date: date, installID: installID, appVersion: appVersion)
 }
 
+func makeResourceException(kind: String, date: Date, appVersion: String) -> Record {
+    var record = makeIncident(type: "ResourceException", date: date, appVersion: appVersion)
+    record.fields["category"] = .string(kind)
+    return record
+}
+
 func makeInstall(date: Date, installID: String) -> Record {
     makeRecord(
         type: "Install",
