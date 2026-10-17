@@ -6,6 +6,7 @@
 // https://opensource.org/licenses/MIT.
 
 import Fluent
+import SQLKit
 import Vapor
 
 /// Executes record queries against the generic `records` table.
@@ -90,10 +91,10 @@ enum RecordQueryService {
             }
             builder.filter(field, .subset(inverse: false), .array(values.map { .bind($0) }))
         case .beginsWith:
-            guard case .string = filter.value else {
+            guard case .string(let prefix) = filter.value else {
                 throw Abort(.badRequest, reason: "Filter 'beginsWith' on '\(filter.field)' requires a string")
             }
-            builder.filter(field, .contains(inverse: false, .prefix), value)
+            builder.filter(.sql(SQLQueryString("substr(\(ident: filter.field), 1, length(\(bind: prefix))) = \(bind: prefix)")))
         }
     }
 

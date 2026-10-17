@@ -1,6 +1,6 @@
 # `POST /api/v1/records/query`
 
-Filters and sorts run against the queryable fields (`name`, `category`, `level`, `uuid`, `device_id`, `install_id`, `launch_id`, `session_id`, `date`, `start_date`, `end_date`, `param_count`, `app_version`, `build_number`). Any other field is rejected with a 400 rather than silently ignored. Operators: `equals`, `notEquals`, `greaterThan`, `greaterThanOrEquals`, `lessThan`, `lessThanOrEquals`, `in`, `beginsWith`.
+Filters and sorts run against the queryable fields (`name`, `category`, `level`, `uuid`, `device_id`, `install_id`, `launch_id`, `session_id`, `date`, `start_date`, `end_date`, `param_count`, `app_version`, `build_number`). Any other field is rejected with a 400 rather than silently ignored. Operators: `equals`, `notEquals`, `greaterThan`, `greaterThanOrEquals`, `lessThan`, `lessThanOrEquals`, `in`, `beginsWith`. `beginsWith` is a case-sensitive, literal prefix match: `_` and `%` match only themselves.
 
 ```json
 {
