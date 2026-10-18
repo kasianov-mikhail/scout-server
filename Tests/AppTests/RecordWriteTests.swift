@@ -123,6 +123,43 @@ final class RecordWriteTests: XCTestCase {
         }
     }
 
+    func testAcceptsBatchLargerThanDefaultBodyLimit() async throws {
+        try await withApp { app in
+            let records = (0..<400).map { _ in
+                makeRecord(type: "Crash", fields: ["threads": .bytes(Data(repeating: 7, count: 2048))])
+            }
+
+            try await app.testable(method: .running(port: 0)).test(
+                .POST, "api/v1/records",
+                headers: .authorized,
+                beforeRequest: { req in
+                    try req.content.encode(WriteRequest(records: records))
+                },
+                afterResponse: { res async in
+                    XCTAssertEqual(res.status, .ok, res.body.string)
+                }
+            )
+        }
+    }
+
+    func testRejectsBatchOverBodyLimit() async throws {
+        try await withApp { app in
+            let size = Int(RecordController.maxBodySize.value) + 1
+            let record = makeRecord(type: "Crash", fields: ["threads": .bytes(Data(repeating: 7, count: size))])
+
+            try await app.testable(method: .running(port: 0)).test(
+                .POST, "api/v1/records",
+                headers: .authorized,
+                beforeRequest: { req in
+                    try req.content.encode(WriteRequest(records: [record]))
+                },
+                afterResponse: { res async in
+                    XCTAssertEqual(res.status, .payloadTooLarge)
+                }
+            )
+        }
+    }
+
     func testFieldValueRoundTrip() throws {
         let values: [String: FieldValue] = [
             "string": .string("hello"),

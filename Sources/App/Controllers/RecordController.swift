@@ -10,10 +10,11 @@ import Vapor
 
 struct RecordController: RouteCollection {
     static let maxBatchSize = 1000
+    static let maxBodySize: ByteCount = "16mb"
 
     func boot(routes: any RoutesBuilder) throws {
         let records = routes.grouped("records")
-        records.post(use: write)
+        records.on(.POST, body: .collect(maxSize: Self.maxBodySize), use: write)
         records.post("query", use: query)
         records.get(":recordName", use: lookup)
     }
