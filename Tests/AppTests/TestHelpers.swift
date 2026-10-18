@@ -147,6 +147,12 @@ func makeScreen(name: String, date: Date, appVersion: String) -> Record {
     return record
 }
 
+func makeCondition(kind: String, date: Date, appVersion: String) -> Record {
+    var record = makeIncident(type: "Condition", date: date, appVersion: appVersion)
+    record.fields["category"] = .string(kind)
+    return record
+}
+
 func makeInstall(date: Date, installID: String) -> Record {
     makeRecord(
         type: "Install",

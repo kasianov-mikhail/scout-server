@@ -387,6 +387,28 @@ final class MetricSeriesTests: XCTestCase {
         }
     }
 
+    func testConditionsCountByKindAndVersion() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeCondition(kind: "memory_warning", date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeCondition(kind: "memory_warning", date: utcDate(2026, 6, 10, 15), appVersion: "3.2.0"),
+                    makeCondition(kind: "thermal_serious", date: utcDate(2026, 6, 10, 9), appVersion: "3.2.0"),
+                    makeCondition(kind: "memory_warning", date: utcDate(2026, 6, 10, 9), appVersion: "3.1.4"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "Condition", by: "version", source: "lifecycle",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            let totals = groups.map { "\($0.category ?? "-") \($0.version ?? "") \($0.points.first?.value.intValue ?? 0)" }
+            XCTAssertEqual(totals, ["memory_warning 3.1.4 1", "memory_warning 3.2.0 2", "thermal_serious 3.2.0 1"])
+        }
+    }
+
     func testLifecycleCountsWithoutCategoryStayWhole() async throws {
         try await withApp { app in
             try await write(

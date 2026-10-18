@@ -10,7 +10,7 @@ import SQLKit
 import Vapor
 
 enum MetricSeriesService {
-    static let lifecycleTypes = ["Crash", "Device", "Hang", "Install", "Launch", "ResourceException", "Screen", "Session", "Version"]
+    static let lifecycleTypes = ["Condition", "Crash", "Device", "Hang", "Install", "Launch", "ResourceException", "Screen", "Session", "Version"]
 
     static let versionCrashName = "VersionCrash"
 
