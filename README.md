@@ -3,7 +3,7 @@
 [![CI](https://github.com/kasianov-mikhail/scout-server/actions/workflows/ci.yml/badge.svg)](https://github.com/kasianov-mikhail/scout-server/actions/workflows/ci.yml) [![Docker](https://github.com/kasianov-mikhail/scout-server/actions/workflows/docker.yml/badge.svg)](https://github.com/kasianov-mikhail/scout-server/actions/workflows/docker.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![Swift](https://img.shields.io/badge/Swift-6.0-orange)
 
 
-A Vapor backend for the [Scout](https://github.com/kasianov-mikhail/scout) package. The server aggregates analytics data natively: clients upload only raw records, and the name-grouped metric series Scout's UI reads are synthesized on the fly with SQL aggregation. Active users (DAU/WAU/MAU) are aggregated the same way and served as a flat series.
+A Vapor backend for the [Scout](https://github.com/kasianov-mikhail/scout) package. The server aggregates analytics data natively: clients upload only raw records, and the name-grouped metric series Scout's UI reads are synthesized on the fly with SQL aggregation.
 
 ## Table of Contents
 - [Features](#features)
