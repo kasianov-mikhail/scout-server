@@ -10,6 +10,7 @@ import Vapor
 
 struct MetricsController: RouteCollection {
     static let defaultSpan: TimeInterval = 90 * 86_400
+    static let maxSpan: TimeInterval = 5 * 366 * 86_400
 
     func boot(routes: any RoutesBuilder) throws {
         let metrics = routes.grouped("metrics")
@@ -19,26 +20,16 @@ struct MetricsController: RouteCollection {
     }
 
     func activeUsers(req: Request) async throws -> ActiveUsersResponse {
-        let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
-        let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
+        let range = try Self.range(of: req)
 
-        guard from < to else {
-            throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
-        }
-
-        let series = try await ActiveUserService.series(from: from, to: to, on: req.db)
+        let series = try await ActiveUserService.series(from: range.lowerBound, to: range.upperBound, on: req.db)
         return ActiveUsersResponse(series: series)
     }
 
     func retention(req: Request) async throws -> RetentionResponse {
-        let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
-        let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
+        let range = try Self.range(of: req)
 
-        guard from < to else {
-            throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
-        }
-
-        let cohorts = try await RetentionService.cohorts(from: from, to: to, on: req.db)
+        let cohorts = try await RetentionService.cohorts(from: range.lowerBound, to: range.upperBound, on: req.db)
         return RetentionResponse(cohorts: cohorts)
     }
 
@@ -74,15 +65,25 @@ struct MetricsController: RouteCollection {
             throw Abort(.badRequest, reason: "Unknown reduce '\(reduceName)'; expected sum or last")
         }
 
-        let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
-        let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
+        let range = try Self.range(of: req)
+
+        let series = try await MetricSeriesService.series(name: name, category: category, values: values, bucket: bucket, byVersion: by == "version", source: source, reduce: reduce, from: range.lowerBound, to: range.upperBound, on: req.db)
+        return MetricSeriesResponse(series: series)
+    }
+
+    private static func range(of req: Request) throws -> Range<Date> {
+        let to = req.query[Int64.self, at: "to"].map(date(ms:)) ?? Date()
+        let from = req.query[Int64.self, at: "from"].map(date(ms:)) ?? to.addingTimeInterval(-defaultSpan)
 
         guard from < to else {
             throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
         }
 
-        let series = try await MetricSeriesService.series(name: name, category: category, values: values, bucket: bucket, byVersion: by == "version", source: source, reduce: reduce, from: from, to: to, on: req.db)
-        return MetricSeriesResponse(series: series)
+        guard to.timeIntervalSince(from) <= maxSpan else {
+            throw Abort(.badRequest, reason: "Range too long: at most \(Int(maxSpan / 86_400)) days")
+        }
+
+        return from..<to
     }
 
     private static func date(ms: Int64) -> Date {

@@ -237,4 +237,16 @@ final class RetentionSeriesTests: XCTestCase {
             )
         }
     }
+
+    func testOverlongRangeIsRejected() async throws {
+        try await withApp { app in
+            try await app.test(
+                .GET, "api/v1/metrics/retention?from=-8640000000000000&to=8640000000000000",
+                headers: .authorized,
+                afterResponse: { res async in
+                    XCTAssertEqual(res.status, .badRequest)
+                }
+            )
+        }
+    }
 }
