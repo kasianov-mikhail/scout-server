@@ -279,7 +279,7 @@ enum MetricSeriesService {
         totals
             .filter { reduce == .last || $0.value != .zero }
             .sorted { $0.key < $1.key }
-            .map { MetricSeriesPoint(date: Int64(($0.key.timeIntervalSince1970 * 1000).rounded()), value: value($0.value)) }
+            .map { MetricSeriesPoint(date: $0.key.milliseconds, value: value($0.value)) }
     }
 }
 

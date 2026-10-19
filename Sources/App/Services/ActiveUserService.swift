@@ -37,7 +37,7 @@ enum ActiveUserService {
         while day < to {
             points.append(
                 ActiveUserPoint(
-                    date: Int64((day.timeIntervalSince1970 * 1000).rounded()),
+                    date: day.milliseconds,
                     dau: active[.daily]?[day]?.count ?? 0,
                     wau: active[.weekly]?[day]?.count ?? 0,
                     mau: active[.monthly]?[day]?.count ?? 0

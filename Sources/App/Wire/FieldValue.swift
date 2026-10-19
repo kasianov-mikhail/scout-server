@@ -31,7 +31,10 @@ extension FieldValue: Codable {
         } else if let value = try container.decodeIfPresent(Double.self, forKey: .double) {
             self = .double(value)
         } else if let value = try container.decodeIfPresent(Int64.self, forKey: .date) {
-            self = .date(Date(timeIntervalSince1970: Double(value) / 1000))
+            guard let date = Date(milliseconds: value) else {
+                throw DecodingError.dataCorruptedError(forKey: .date, in: container, debugDescription: "Date out of range")
+            }
+            self = .date(date)
         } else if let value = try container.decodeIfPresent(Data.self, forKey: .bytes) {
             self = .bytes(value)
         } else if let value = try container.decodeIfPresent([String].self, forKey: .strings) {
@@ -57,7 +60,7 @@ extension FieldValue: Codable {
         case .double(let value):
             try container.encode(value, forKey: .double)
         case .date(let value):
-            try container.encode(Int64((value.timeIntervalSince1970 * 1000).rounded()), forKey: .date)
+            try container.encode(value.milliseconds, forKey: .date)
         case .bytes(let value):
             try container.encode(value, forKey: .bytes)
         case .strings(let value):

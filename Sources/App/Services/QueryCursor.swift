@@ -33,5 +33,8 @@ struct QueryCursor: Codable, Equatable {
         } catch {
             throw Abort(.badRequest, reason: "Malformed cursor")
         }
+        guard offset >= 0 else {
+            throw Abort(.badRequest, reason: "Malformed cursor")
+        }
     }
 }
