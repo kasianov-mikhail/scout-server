@@ -11,7 +11,7 @@ import XCTVapor
 
 final class MetricSeriesTests: XCTestCase {
     func value(_ groups: [MetricSeriesGroup], _ name: String, _ date: Date) -> FieldValue? {
-        let ms = Int64((date.timeIntervalSince1970 * 1000).rounded())
+        let ms = date.milliseconds
         return groups.first { $0.name == name }?.points.first { $0.date == ms }?.value
     }
 

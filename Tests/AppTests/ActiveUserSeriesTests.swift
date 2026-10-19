@@ -11,7 +11,7 @@ import XCTVapor
 
 final class ActiveUserSeriesTests: XCTestCase {
     func point(_ series: [ActiveUserPoint], _ date: Date) -> ActiveUserPoint? {
-        let ms = Int64((date.timeIntervalSince1970 * 1000).rounded())
+        let ms = date.milliseconds
         return series.first { $0.date == ms }
     }
 
@@ -127,7 +127,7 @@ final class ActiveUserSeriesTests: XCTestCase {
     func testEmptyRangeIsRejected() async throws {
         try await withApp { app in
             let to = utcDate(2026, 6, 1)
-            let ms = Int64((to.timeIntervalSince1970 * 1000).rounded())
+            let ms = to.milliseconds
             try await app.test(
                 .GET, "api/v1/metrics/active-users?from=\(ms)&to=\(ms)",
                 headers: .authorized,
@@ -150,6 +150,18 @@ final class ActiveUserSeriesTests: XCTestCase {
         try await withApp { app in
             try await app.test(
                 .GET, "api/v1/metrics/active-users?from=-8640000000000000&to=8640000000000000",
+                headers: .authorized,
+                afterResponse: { res async in
+                    XCTAssertEqual(res.status, .badRequest)
+                }
+            )
+        }
+    }
+
+    func testRangeOutOfDateLimitsIsRejected() async throws {
+        try await withApp { app in
+            try await app.test(
+                .GET, "api/v1/metrics/active-users?from=0&to=\(Int64.max)",
                 headers: .authorized,
                 afterResponse: { res async in
                     XCTAssertEqual(res.status, .badRequest)

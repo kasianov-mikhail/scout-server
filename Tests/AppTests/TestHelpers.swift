@@ -93,7 +93,7 @@ func makeSession(start: Date, installID: String, deviceID: String? = nil, sessio
 func makeVisit(date: Date, deviceID: String, installID: String = UUID().uuidString) -> Record {
     makeRecord(
         type: "Visit",
-        name: "\(deviceID)-\(Int64((date.startOfDay.timeIntervalSince1970 * 1000).rounded()))",
+        name: "\(deviceID)-\(date.startOfDay.milliseconds)",
         fields: [
             "date": .date(date),
             "device_id": .string(deviceID),
@@ -236,8 +236,8 @@ func query(_ request: QueryRequest, on app: Application) async throws -> QueryRe
 }
 
 func activeUsers(from: Date, to: Date, on app: Application) async throws -> [ActiveUserPoint] {
-    let fromMs = Int64((from.timeIntervalSince1970 * 1000).rounded())
-    let toMs = Int64((to.timeIntervalSince1970 * 1000).rounded())
+    let fromMs = from.milliseconds
+    let toMs = to.milliseconds
     var response: ActiveUsersResponse?
     try await app.test(
         .GET, "api/v1/metrics/active-users?from=\(fromMs)&to=\(toMs)",
@@ -251,8 +251,8 @@ func activeUsers(from: Date, to: Date, on app: Application) async throws -> [Act
 }
 
 func retention(from: Date, to: Date, on app: Application) async throws -> [RetentionCohortPoint] {
-    let fromMs = Int64((from.timeIntervalSince1970 * 1000).rounded())
-    let toMs = Int64((to.timeIntervalSince1970 * 1000).rounded())
+    let fromMs = from.milliseconds
+    let toMs = to.milliseconds
     var response: RetentionResponse?
     try await app.test(
         .GET, "api/v1/metrics/retention?from=\(fromMs)&to=\(toMs)",
@@ -266,8 +266,8 @@ func retention(from: Date, to: Date, on app: Application) async throws -> [Reten
 }
 
 func metricSeries(name: String? = nil, category: String? = nil, values: String? = nil, bucket: String? = nil, by: String? = nil, source: String? = nil, reduce: String? = nil, from: Date, to: Date, on app: Application) async throws -> [MetricSeriesGroup] {
-    let fromMs = Int64((from.timeIntervalSince1970 * 1000).rounded())
-    let toMs = Int64((to.timeIntervalSince1970 * 1000).rounded())
+    let fromMs = from.milliseconds
+    let toMs = to.milliseconds
     var path = "api/v1/metrics/series?from=\(fromMs)&to=\(toMs)"
     if let name { path += "&name=\(name)" }
     if let category { path += "&category=\(category)" }

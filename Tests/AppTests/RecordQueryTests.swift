@@ -231,6 +231,65 @@ final class RecordQueryTests: XCTestCase {
         }
     }
 
+    func testCursorWithHugeOffsetReturnsEmptyPage() async throws {
+        try await withApp { app in
+            try await write([makeEvent(name: "login", date: utcDate(2026, 6, 10, 9))], to: app)
+
+            let cursor = QueryCursor(query: QueryRequest(recordType: "Event"), offset: .max)
+            let response = try await query(QueryRequest(cursor: cursor.token), on: app)
+
+            XCTAssertEqual(response.records, [])
+            XCTAssertNil(response.cursor)
+        }
+    }
+
+    func testRejectsCursorWithNegativeOffset() async throws {
+        try await withApp { app in
+            let cursor = QueryCursor(query: QueryRequest(recordType: "Event"), offset: -1)
+            try await app.test(
+                .POST, "api/v1/records/query",
+                headers: .authorized,
+                beforeRequest: { req in
+                    try req.content.encode(QueryRequest(cursor: cursor.token))
+                },
+                afterResponse: { res async in
+                    XCTAssertEqual(res.status, .badRequest)
+                }
+            )
+        }
+    }
+
+    func testRejectsDateFilterOutOfRange() async throws {
+        try await withApp { app in
+            try await app.test(
+                .POST, "api/v1/records/query",
+                headers: .authorized,
+                beforeRequest: { req in
+                    req.body = ByteBuffer(string: #"{"recordType":"Event","filters":[{"field":"date","op":"lessThan","value":{"date":9223372036854775807}}]}"#)
+                },
+                afterResponse: { res async in
+                    XCTAssertEqual(res.status, .badRequest)
+                }
+            )
+        }
+    }
+
+    func testFiltersByDateAtRangeLimit() async throws {
+        try await withApp { app in
+            try await write([makeEvent(name: "login", date: utcDate(2026, 6, 10, 9))], to: app)
+
+            let response = try await query(
+                QueryRequest(
+                    recordType: "Event",
+                    filters: [QueryFilter(field: "date", op: .lessThan, value: .date(Date(milliseconds: 8_640_000_000_000_000)!))]
+                ),
+                on: app
+            )
+
+            XCTAssertEqual(response.records.count, 1)
+        }
+    }
+
     func testQueryDoesNotLeakAcrossRecordTypes() async throws {
         try await withApp { app in
             try await write(

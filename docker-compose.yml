@@ -1,6 +1,7 @@
 services:
   app:
     image: ghcr.io/kasianov-mikhail/scout-server:latest
+    restart: unless-stopped
     build:
       context: .
     environment:
@@ -17,6 +18,7 @@ services:
 
   db:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: scout
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-scout}

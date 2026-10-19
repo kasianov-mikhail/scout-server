@@ -142,9 +142,4 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
-          script: |
-            set -e
-            cd /opt/scout
-            docker compose pull
-            docker compose up -d
-            docker image prune -f
+          script: /opt/scout-server/update.sh

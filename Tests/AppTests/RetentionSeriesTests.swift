@@ -11,7 +11,7 @@ import XCTVapor
 
 final class RetentionSeriesTests: XCTestCase {
     func cohort(_ cohorts: [RetentionCohortPoint], week: Date) -> RetentionCohortPoint? {
-        let ms = Int64((week.timeIntervalSince1970 * 1000).rounded())
+        let ms = week.milliseconds
         return cohorts.first { $0.date == ms }
     }
 
@@ -227,7 +227,7 @@ final class RetentionSeriesTests: XCTestCase {
     func testEmptyRangeIsRejected() async throws {
         try await withApp { app in
             let to = utcDate(2026, 6, 1)
-            let ms = Int64((to.timeIntervalSince1970 * 1000).rounded())
+            let ms = to.milliseconds
             try await app.test(
                 .GET, "api/v1/metrics/retention?from=\(ms)&to=\(ms)",
                 headers: .authorized,

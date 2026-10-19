@@ -57,7 +57,7 @@ enum RetentionService {
             let cohort = cohorts[week] ?? Tally()
 
             return RetentionCohortPoint(
-                date: Int64((week.timeIntervalSince1970 * 1000).rounded()),
+                date: week.milliseconds,
                 size: cohort.size,
                 retained: cohort.cells(week: week, to: to),
                 segments: (segments[week] ?? [:]).sorted { $0.key < $1.key }.map { name, segment in
