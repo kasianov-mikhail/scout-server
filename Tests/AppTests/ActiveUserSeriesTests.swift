@@ -138,6 +138,26 @@ final class ActiveUserSeriesTests: XCTestCase {
         }
     }
 
+    func testTwoYearRangeIsAccepted() async throws {
+        try await withApp { app in
+            let series = try await activeUsers(from: utcDate(2024, 6, 1), to: utcDate(2026, 6, 2), on: app)
+
+            XCTAssertEqual(series.count, 731)
+        }
+    }
+
+    func testOverlongRangeIsRejected() async throws {
+        try await withApp { app in
+            try await app.test(
+                .GET, "api/v1/metrics/active-users?from=-8640000000000000&to=8640000000000000",
+                headers: .authorized,
+                afterResponse: { res async in
+                    XCTAssertEqual(res.status, .badRequest)
+                }
+            )
+        }
+    }
+
     func testRangeOutOfDateLimitsIsRejected() async throws {
         try await withApp { app in
             try await app.test(
