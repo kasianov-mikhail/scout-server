@@ -175,4 +175,18 @@ final class RecordWriteTests: XCTestCase {
 
         XCTAssertEqual(decoded, values)
     }
+
+    func testFieldValueRejectsDateOutOfRange() {
+        for ms in [Int64.max, Int64.min, 8_640_000_000_000_001] {
+            let data = Data(#"{"date":\#(ms)}"#.utf8)
+            XCTAssertThrowsError(try JSONDecoder().decode(FieldValue.self, from: data))
+        }
+    }
+
+    func testWritesRecordAtDateRangeLimit() async throws {
+        try await withApp { app in
+            let event = makeRecord(type: "Event", fields: ["date": .date(Date(milliseconds: 8_640_000_000_000_000)!)])
+            try await write([event], to: app)
+        }
+    }
 }

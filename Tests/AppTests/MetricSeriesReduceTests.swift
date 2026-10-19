@@ -11,7 +11,7 @@ import XCTVapor
 
 final class MetricSeriesReduceTests: XCTestCase {
     private func value(_ groups: [MetricSeriesGroup], _ name: String, _ date: Date) -> FieldValue? {
-        let ms = Int64((date.timeIntervalSince1970 * 1000).rounded())
+        let ms = date.milliseconds
         return groups.first { $0.name == name }?.points.first { $0.date == ms }?.value
     }
 
@@ -113,8 +113,8 @@ final class MetricSeriesReduceTests: XCTestCase {
 
     func testUnknownReduceIsRejected() async throws {
         try await withApp { app in
-            let from = Int64(utcDate(2026, 6, 10).timeIntervalSince1970 * 1000)
-            let to = Int64(utcDate(2026, 6, 11).timeIntervalSince1970 * 1000)
+            let from = utcDate(2026, 6, 10).milliseconds
+            let to = utcDate(2026, 6, 11).milliseconds
 
             try await app.test(
                 .GET, "api/v1/metrics/series?category=meter&reduce=median&from=\(from)&to=\(to)",

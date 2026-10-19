@@ -19,8 +19,8 @@ struct MetricsController: RouteCollection {
     }
 
     func activeUsers(req: Request) async throws -> ActiveUsersResponse {
-        let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
-        let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
+        let to = try req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
+        let from = try req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
 
         guard from < to else {
             throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
@@ -31,8 +31,8 @@ struct MetricsController: RouteCollection {
     }
 
     func retention(req: Request) async throws -> RetentionResponse {
-        let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
-        let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
+        let to = try req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
+        let from = try req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
 
         guard from < to else {
             throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
@@ -74,8 +74,8 @@ struct MetricsController: RouteCollection {
             throw Abort(.badRequest, reason: "Unknown reduce '\(reduceName)'; expected sum or last")
         }
 
-        let to = req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
-        let from = req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
+        let to = try req.query[Int64.self, at: "to"].map(Self.date(ms:)) ?? Date()
+        let from = try req.query[Int64.self, at: "from"].map(Self.date(ms:)) ?? to.addingTimeInterval(-Self.defaultSpan)
 
         guard from < to else {
             throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
@@ -85,7 +85,10 @@ struct MetricsController: RouteCollection {
         return MetricSeriesResponse(series: series)
     }
 
-    private static func date(ms: Int64) -> Date {
-        Date(timeIntervalSince1970: Double(ms) / 1000)
+    private static func date(ms: Int64) throws -> Date {
+        guard let date = Date(milliseconds: ms) else {
+            throw Abort(.badRequest, reason: "Date \(ms) is out of range")
+        }
+        return date
     }
 }
