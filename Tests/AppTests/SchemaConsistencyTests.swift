@@ -64,6 +64,25 @@ final class SchemaConsistencyTests: XCTestCase {
         }
     }
 
+    func testInstallLookupUsesIndex() async throws {
+        try await withApp { app in
+            let sql = try XCTUnwrap(app.db as? any SQLDatabase)
+
+            if sql.dialect.name == "sqlite" {
+                let rows = try await sql.raw(
+                    "EXPLAIN QUERY PLAN SELECT * FROM records WHERE record_type = 'Session' AND install_id IN ('a', 'b')"
+                ).all()
+                let plan = try rows.map { try $0.decode(column: "detail", as: String.self) }.joined(separator: "\n")
+                XCTAssertTrue(plan.contains(AddInstallIndex.index), "Lookup skips \(AddInstallIndex.index):\n\(plan)")
+            } else {
+                let rows = try await sql.raw(
+                    "SELECT indexname FROM pg_indexes WHERE tablename = 'records' AND indexname = \(bind: AddInstallIndex.index)"
+                ).all()
+                XCTAssertEqual(rows.count, 1, "Missing index \(AddInstallIndex.index)")
+            }
+        }
+    }
+
     func testDeviceLookupUsesIndex() async throws {
         try await withApp { app in
             let sql = try XCTUnwrap(app.db as? any SQLDatabase)

@@ -254,6 +254,24 @@ struct AddRecordIndexes: AsyncMigration {
     }
 }
 
+struct AddInstallIndex: AsyncMigration {
+    // Session timelines filter by install_id, and retention joins installs to their active days.
+    static let index = "records_record_type_install_id_day_epoch_idx"
+
+    func prepare(on database: any Database) async throws {
+        try await database.sql().create(index: Self.index)
+            .on(RecordModel.schema)
+            .column("record_type")
+            .column("install_id")
+            .column("day_epoch")
+            .run()
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.sql().drop(index: Self.index).ifExists().run()
+    }
+}
+
 struct AddDeviceIndex: AsyncMigration {
     // Device screens fetch the records of one device by device_id.
     static let index = "records_record_type_device_id_idx"

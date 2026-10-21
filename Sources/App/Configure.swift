@@ -35,6 +35,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(AddVersionFields())
     app.migrations.add(AddOSVersionField())
     app.migrations.add(AddRecordIndexes())
+    app.migrations.add(AddInstallIndex())
     app.migrations.add(AddDeviceIndex())
 
     app.apiKeys = APIKeys(
