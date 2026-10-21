@@ -12,7 +12,7 @@ import Vapor
 enum MetricSeriesService {
     static let lifecycleTypes = ["Condition", "Crash", "Device", "Hang", "Install", "Launch", "ResourceException", "Screen", "Session", "Version"]
 
-    static let versionCrashName = "VersionCrash"
+    private static let firstSeenTypes = ["VersionCrash": "Crash", "VersionInstall": "Version"]
 
     static let dailyMetricType = "DailyMetric"
 
@@ -108,8 +108,8 @@ enum MetricSeriesService {
         for type in lifecycleTypes where constraints.name == nil || constraints.name == type {
             rows += try await countRows(recordType: type, named: type, constraints: constraints, on: database)
         }
-        if constraints.name == nil || constraints.name == versionCrashName {
-            rows += try await firstCrashRows(constraints, on: database)
+        for (name, type) in firstSeenTypes where constraints.name == nil || constraints.name == name {
+            rows += try await firstSeenRows(recordType: type, named: name, constraints: constraints, on: database)
         }
         rows += try await dailyMetricRows(constraints, on: database)
         return rows
@@ -160,7 +160,7 @@ enum MetricSeriesService {
         return rows.filter(constraints.matches)
     }
 
-    private static func firstCrashRows(_ constraints: Constraints, on database: any Database) async throws -> [HourRow] {
+    private static func firstSeenRows(recordType: String, named: String, constraints: Constraints, on database: any Database) async throws -> [HourRow] {
         let sql = try database.sql()
         let range = constraints.hourRange
 
@@ -170,15 +170,15 @@ enum MetricSeriesService {
             FROM (
                 SELECT app_version, MIN(hour_epoch) AS hour_epoch
                 FROM records
-                WHERE record_type = \(bind: "Crash")
-                  AND hour_epoch >= \(bind: range.lowerBound) AND hour_epoch < \(bind: range.upperBound)
+                WHERE record_type = \(bind: recordType) AND hour_epoch < \(bind: range.upperBound)
                 GROUP BY install_id, app_version
+                HAVING MIN(hour_epoch) >= \(bind: range.lowerBound)
             ) AS firsts
             GROUP BY app_version, hour_epoch
             """
         ).all(decoding: HourRow.self).map { row in
             var row = row
-            row.name = versionCrashName
+            row.name = named
             return row
         }
 

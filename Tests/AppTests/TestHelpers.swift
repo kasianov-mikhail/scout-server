@@ -134,6 +134,19 @@ func makeCrash(date: Date, installID: String? = nil, deviceID: String? = nil, ap
     makeIncident(type: "Crash", date: date, installID: installID, deviceID: deviceID, appVersion: appVersion)
 }
 
+func makeVersion(date: Date, installID: String = UUID().uuidString, appVersion: String, build: String) -> Record {
+    makeRecord(
+        type: "Version",
+        fields: [
+            "date": .date(date),
+            "install_id": .string(installID),
+            "launch_id": .string(UUID().uuidString),
+            "app_version": .string(appVersion),
+            "build_number": .string(build),
+        ]
+    )
+}
+
 func makeDevice(deviceID: String, model: String, date: Date) -> Record {
     makeRecord(
         type: "Device",

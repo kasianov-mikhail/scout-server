@@ -187,6 +187,7 @@ final class MetricSeriesTests: XCTestCase {
                     makeSession(start: utcDate(2026, 6, 10, 9), installID: "a"),
                     makeCrash(date: utcDate(2026, 6, 10, 10), installID: "a", appVersion: "1.0"),
                     makeHang(date: utcDate(2026, 6, 10, 11)),
+                    makeVersion(date: utcDate(2026, 6, 10, 9), installID: "a", appVersion: "1.0", build: "1"),
                     makeMetric(name: "requests", category: "counter", date: utcDate(2026, 6, 10, 9), value: .int(5)),
                     makeMetric(type: "DoubleMetric", name: "duration", category: "timer", date: utcDate(2026, 6, 10, 9), value: .double(0.5)),
                 ],
@@ -196,7 +197,7 @@ final class MetricSeriesTests: XCTestCase {
             let groups = try await metricSeries(from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app)
 
             let names = Set(groups.map(\.name))
-            XCTAssertTrue(names.isSuperset(of: ["login", "Session", "Crash", "Hang", "VersionCrash", "requests", "duration"]), "\(names)")
+            XCTAssertTrue(names.isSuperset(of: ["login", "Session", "Crash", "Hang", "VersionCrash", "VersionInstall", "requests", "duration"]), "\(names)")
             XCTAssertEqual(value(groups, "login", utcDate(2026, 6, 10)), .int(1))
             XCTAssertEqual(value(groups, "duration", utcDate(2026, 6, 10)), .double(0.5))
         }
@@ -279,6 +280,71 @@ final class MetricSeriesTests: XCTestCase {
 
             XCTAssertEqual(groups.map(\.version), ["3.1.4", "3.2.0"])
             XCTAssertEqual(groups.map { $0.points.reduce(0) { $0 + ($1.value.intValue ?? 0) } }, [1, 2])
+        }
+    }
+
+    func testVersionCrashSkipsInstallsThatCrashedBeforeTheRange() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeCrash(date: utcDate(2026, 6, 9, 9), installID: "a", appVersion: "3.2.0"),
+                    makeCrash(date: utcDate(2026, 6, 10, 9), installID: "a", appVersion: "3.2.0"),
+                    makeCrash(date: utcDate(2026, 6, 10, 9), installID: "b", appVersion: "3.2.0"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "VersionCrash", by: "version",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            XCTAssertEqual(groups.map { $0.points.map(\.value) }, [[.int(1)]])
+        }
+    }
+
+    func testVersionInstallCountsEachInstallOncePerVersion() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeVersion(date: utcDate(2026, 6, 10, 9), installID: "a", appVersion: "3.2.0", build: "45"),
+                    makeVersion(date: utcDate(2026, 6, 10, 15), installID: "a", appVersion: "3.2.0", build: "46"),
+                    makeVersion(date: utcDate(2026, 6, 10, 9), installID: "b", appVersion: "3.2.0", build: "46"),
+                    makeVersion(date: utcDate(2026, 6, 10, 9), installID: "a", appVersion: "3.1.4", build: "40"),
+                ],
+                to: app
+            )
+
+            let groups = try await metricSeries(
+                name: "VersionInstall", by: "version",
+                from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            XCTAssertEqual(groups.map(\.version), ["3.1.4", "3.2.0"])
+            XCTAssertEqual(groups.map { $0.points.reduce(0) { $0 + ($1.value.intValue ?? 0) } }, [1, 2])
+        }
+    }
+
+    func testVersionInstallSplitsAdditivelyAcrossRanges() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeVersion(date: utcDate(2026, 6, 9, 9), installID: "a", appVersion: "3.2.0", build: "45"),
+                    makeVersion(date: utcDate(2026, 6, 10, 9), installID: "a", appVersion: "3.2.0", build: "46"),
+                    makeVersion(date: utcDate(2026, 6, 10, 9), installID: "b", appVersion: "3.2.0", build: "46"),
+                ],
+                to: app
+            )
+
+            let before = try await metricSeries(
+                name: "VersionInstall", from: utcDate(2026, 6, 9), to: utcDate(2026, 6, 10), on: app
+            )
+            let after = try await metricSeries(
+                name: "VersionInstall", from: utcDate(2026, 6, 10), to: utcDate(2026, 6, 11), on: app
+            )
+
+            XCTAssertEqual(value(before, "VersionInstall", utcDate(2026, 6, 9)), .int(1))
+            XCTAssertEqual(value(after, "VersionInstall", utcDate(2026, 6, 10)), .int(1))
         }
     }
 
