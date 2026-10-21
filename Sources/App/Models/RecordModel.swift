@@ -226,3 +226,20 @@ struct AddOSVersionField: AsyncMigration {
             .update()
     }
 }
+
+struct AddDeviceIndex: AsyncMigration {
+    // Device screens fetch the records of one device by device_id.
+    static let index = "records_record_type_device_id_idx"
+
+    func prepare(on database: any Database) async throws {
+        try await database.sql().create(index: Self.index)
+            .on(RecordModel.schema)
+            .column("record_type")
+            .column("device_id")
+            .run()
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.sql().drop(index: Self.index).ifExists().run()
+    }
+}
