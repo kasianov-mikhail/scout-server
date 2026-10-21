@@ -17,7 +17,7 @@ A Vapor backend for the [Scout](https://github.com/kasianov-mikhail/scout) packa
 
 | | | |
 |:-:|-|-|
-| 📊 | **Native Aggregation** | The name-grouped metric series Scout's UI reads, the DAU/WAU/MAU active-user series, and the retention cohorts are synthesized on the fly with SQL — clients upload only raw records. |
+| 📊 | **Native Aggregation** | The name-grouped metric series Scout's UI reads, the DAU/WAU/MAU active-user series, the retention cohorts, and the per-device summary with distinct device counts are synthesized on the fly with SQL — clients upload only raw records. |
 | 🔁 | **Idempotent Upserts** | Records are upserted by `recordID`, so re-sent batches overwrite in place and sync retries stay safe. The [Scout](https://github.com/kasianov-mikhail/scout) dashboard queries the API directly. |
 | 🔑 | **API Keys** | Endpoints are guarded by API keys, passed via an `X-API-Key` header or a bearer token. |
 | 🐘 | **Postgres** | Records persist in Postgres with migrations run automatically on boot; tests run against in-memory SQLite. |

@@ -108,7 +108,7 @@ func makeVisit(date: Date, deviceID: String, installID: String = UUID().uuidStri
     )
 }
 
-func makeIncident(type: String, date: Date, installID: String? = nil, appVersion: String? = nil) -> Record {
+func makeIncident(type: String, date: Date, installID: String? = nil, deviceID: String? = nil, appVersion: String? = nil) -> Record {
     var fields: [String: FieldValue] = [
         "date": .date(date),
         "hour": .date(date.startOfHour),
@@ -121,14 +121,34 @@ func makeIncident(type: String, date: Date, installID: String? = nil, appVersion
     if let installID {
         fields["install_id"] = .string(installID)
     }
+    if let deviceID {
+        fields["device_id"] = .string(deviceID)
+    }
     if let appVersion {
         fields["app_version"] = .string(appVersion)
     }
     return makeRecord(type: type, fields: fields)
 }
 
-func makeCrash(date: Date, installID: String? = nil, appVersion: String? = nil) -> Record {
-    makeIncident(type: "Crash", date: date, installID: installID, appVersion: appVersion)
+func makeCrash(date: Date, installID: String? = nil, deviceID: String? = nil, appVersion: String? = nil) -> Record {
+    makeIncident(type: "Crash", date: date, installID: installID, deviceID: deviceID, appVersion: appVersion)
+}
+
+func makeDevice(deviceID: String, model: String, date: Date) -> Record {
+    makeRecord(
+        type: "Device",
+        name: deviceID,
+        fields: [
+            "date": .date(date),
+            "model": .string(model),
+            "device_id": .string(deviceID),
+            "hour": .date(date.startOfHour),
+            "day": .date(date.startOfDay),
+            "week": .date(date.startOfWeek),
+            "month": .date(date.startOfMonth),
+            "version": .int(1),
+        ]
+    )
 }
 
 func makeHang(date: Date, installID: String? = nil, appVersion: String? = nil) -> Record {
@@ -287,4 +307,31 @@ func metricSeries(name: String? = nil, category: String? = nil, values: String? 
         }
     )
     return response!.series
+}
+
+func devices(from: Date, to: Date, on app: Application) async throws -> [DevicePoint] {
+    var response: DevicesResponse?
+    try await app.test(
+        .GET, "api/v1/metrics/devices?from=\(from.milliseconds)&to=\(to.milliseconds)",
+        headers: .authorized,
+        afterResponse: { res async throws in
+            XCTAssertEqual(res.status, .ok, res.body.string)
+            response = try res.content.decode(DevicesResponse.self)
+        }
+    )
+    return response!.devices
+}
+
+func deviceCounts(_ ranges: [Range<Date>], on app: Application) async throws -> [Int] {
+    let list = ranges.map { "\($0.lowerBound.milliseconds)-\($0.upperBound.milliseconds)" }.joined(separator: ",")
+    var response: DeviceCountsResponse?
+    try await app.test(
+        .GET, "api/v1/metrics/device-counts?ranges=\(list)",
+        headers: .authorized,
+        afterResponse: { res async throws in
+            XCTAssertEqual(res.status, .ok, res.body.string)
+            response = try res.content.decode(DeviceCountsResponse.self)
+        }
+    )
+    return response!.counts
 }
