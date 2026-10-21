@@ -226,3 +226,20 @@ struct AddOSVersionField: AsyncMigration {
             .update()
     }
 }
+
+struct AddSessionIndex: AsyncMigration {
+    // Timelines fetch the events of a session by session_id.
+    static let index = "records_record_type_session_id_idx"
+
+    func prepare(on database: any Database) async throws {
+        try await database.sql().create(index: Self.index)
+            .on(RecordModel.schema)
+            .column("record_type")
+            .column("session_id")
+            .run()
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.sql().drop(index: Self.index).ifExists().run()
+    }
+}
