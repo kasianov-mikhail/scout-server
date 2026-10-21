@@ -11,12 +11,15 @@ import Vapor
 struct MetricsController: RouteCollection {
     static let defaultSpan: TimeInterval = 90 * 86_400
     static let maxSpan: TimeInterval = 5 * 366 * 86_400
+    static let maxRanges = 32
 
     func boot(routes: any RoutesBuilder) throws {
         let metrics = routes.grouped("metrics")
         metrics.get("active-users", use: activeUsers)
         metrics.get("retention", use: retention)
         metrics.get("series", use: series)
+        metrics.get("devices", use: devices)
+        metrics.get("device-counts", use: deviceCounts)
     }
 
     func activeUsers(req: Request) async throws -> ActiveUsersResponse {
@@ -71,10 +74,48 @@ struct MetricsController: RouteCollection {
         return MetricSeriesResponse(series: series)
     }
 
+    func devices(req: Request) async throws -> DevicesResponse {
+        let range = try Self.range(of: req)
+
+        let devices = try await DeviceService.devices(from: range.lowerBound, to: range.upperBound, on: req.db)
+        return DevicesResponse(devices: devices)
+    }
+
+    func deviceCounts(req: Request) async throws -> DeviceCountsResponse {
+        guard let list = req.query[String.self, at: "ranges"].flatMap({ $0.isEmpty ? nil : $0 }) else {
+            throw Abort(.badRequest, reason: "Missing 'ranges': expected from-to pairs in milliseconds, comma-separated")
+        }
+
+        let pairs = list.split(separator: ",")
+
+        guard pairs.count <= Self.maxRanges else {
+            throw Abort(.badRequest, reason: "Too many ranges: at most \(Self.maxRanges)")
+        }
+
+        let ranges = try pairs.map(Self.range(pair:))
+
+        let counts = try await DeviceService.counts(ranges: ranges, on: req.db)
+        return DeviceCountsResponse(counts: counts)
+    }
+
+    private static func range(pair: Substring) throws -> Range<Date> {
+        let bounds = pair.split(separator: "-").compactMap { Int64($0) }
+
+        guard bounds.count == 2 else {
+            throw Abort(.badRequest, reason: "Malformed range '\(pair)': expected from-to in milliseconds")
+        }
+
+        return try range(from: date(ms: bounds[0]), to: date(ms: bounds[1]))
+    }
+
     private static func range(of req: Request) throws -> Range<Date> {
         let to = try req.query[Int64.self, at: "to"].map(date(ms:)) ?? Date()
         let from = try req.query[Int64.self, at: "from"].map(date(ms:)) ?? to.addingTimeInterval(-defaultSpan)
 
+        return try range(from: from, to: to)
+    }
+
+    private static func range(from: Date, to: Date) throws -> Range<Date> {
         guard from < to else {
             throw Abort(.badRequest, reason: "Empty range: 'from' must be before 'to'")
         }
