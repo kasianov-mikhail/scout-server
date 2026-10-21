@@ -227,6 +227,33 @@ struct AddOSVersionField: AsyncMigration {
     }
 }
 
+struct AddRecordIndexes: AsyncMigration {
+    // Every aggregate filters by record_type plus a range on one of these columns.
+    static let rangeColumns = ["hour_epoch", "day_epoch", "date", "start_date"]
+
+    func prepare(on database: any Database) async throws {
+        let sql = try database.sql()
+        for column in Self.rangeColumns {
+            try await sql.create(index: Self.indexName(column))
+                .on(RecordModel.schema)
+                .column("record_type")
+                .column(column)
+                .run()
+        }
+    }
+
+    func revert(on database: any Database) async throws {
+        let sql = try database.sql()
+        for column in Self.rangeColumns {
+            try await sql.drop(index: Self.indexName(column)).ifExists().run()
+        }
+    }
+
+    static func indexName(_ column: String) -> String {
+        "records_record_type_\(column)_idx"
+    }
+}
+
 struct AddDeviceIndex: AsyncMigration {
     // Device screens fetch the records of one device by device_id.
     static let index = "records_record_type_device_id_idx"

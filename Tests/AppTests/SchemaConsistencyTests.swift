@@ -38,6 +38,32 @@ final class SchemaConsistencyTests: XCTestCase {
         }
     }
 
+    func testRangeQueriesUseRecordTypeIndexes() async throws {
+        try await withApp { app in
+            let sql = try XCTUnwrap(app.db as? any SQLDatabase)
+
+            for column in AddRecordIndexes.rangeColumns {
+                let index = AddRecordIndexes.indexName(column)
+
+                if sql.dialect.name == "sqlite" {
+                    let rows = try await sql.raw(
+                        """
+                        EXPLAIN QUERY PLAN SELECT COUNT(*) FROM records
+                        WHERE record_type = 'Event' AND \(ident: column) >= 0 AND \(ident: column) < 1
+                        """
+                    ).all()
+                    let plan = try rows.map { try $0.decode(column: "detail", as: String.self) }.joined(separator: "\n")
+                    XCTAssertTrue(plan.contains(index), "Range on '\(column)' skips \(index):\n\(plan)")
+                } else {
+                    let rows = try await sql.raw(
+                        "SELECT indexname FROM pg_indexes WHERE tablename = 'records' AND indexname = \(bind: index)"
+                    ).all()
+                    XCTAssertEqual(rows.count, 1, "Missing index \(index)")
+                }
+            }
+        }
+    }
+
     func testDeviceLookupUsesIndex() async throws {
         try await withApp { app in
             let sql = try XCTUnwrap(app.db as? any SQLDatabase)
