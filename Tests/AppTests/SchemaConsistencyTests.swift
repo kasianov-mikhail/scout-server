@@ -102,6 +102,25 @@ final class SchemaConsistencyTests: XCTestCase {
         }
     }
 
+    func testDeviceLookupUsesIndex() async throws {
+        try await withApp { app in
+            let sql = try XCTUnwrap(app.db as? any SQLDatabase)
+
+            if sql.dialect.name == "sqlite" {
+                let rows = try await sql.raw(
+                    "EXPLAIN QUERY PLAN SELECT * FROM records WHERE record_type = 'Launch' AND device_id = 'a'"
+                ).all()
+                let plan = try rows.map { try $0.decode(column: "detail", as: String.self) }.joined(separator: "\n")
+                XCTAssertTrue(plan.contains(AddDeviceIndex.index), "Lookup skips \(AddDeviceIndex.index):\n\(plan)")
+            } else {
+                let rows = try await sql.raw(
+                    "SELECT indexname FROM pg_indexes WHERE tablename = 'records' AND indexname = \(bind: AddDeviceIndex.index)"
+                ).all()
+                XCTAssertEqual(rows.count, 1, "Missing index \(AddDeviceIndex.index)")
+            }
+        }
+    }
+
     private static func columns(of table: String, in sql: any SQLDatabase) async throws -> Set<String> {
         if sql.dialect.name == "sqlite" {
             let rows = try await sql.raw("PRAGMA table_info(\(unsafeRaw: table))").all()
