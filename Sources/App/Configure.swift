@@ -38,6 +38,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(AddInstallIndex())
     app.migrations.add(AddSessionIndex())
     app.migrations.add(AddDeviceIndex())
+    app.migrations.add(AddFingerprintField())
 
     app.apiKeys = APIKeys(
         keys: Environment.get("SCOUT_API_KEYS").map(APIKeys.parse) ?? [],

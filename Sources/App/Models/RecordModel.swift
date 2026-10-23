@@ -53,6 +53,9 @@ final class RecordModel: Model, @unchecked Sendable {
     @OptionalField(key: "os_version")
     var osVersion: String?
 
+    @OptionalField(key: "fingerprint")
+    var fingerprint: String?
+
     @OptionalField(key: "date")
     var date: Date?
 
@@ -109,6 +112,7 @@ extension RecordModel {
         appVersion = fields["app_version"]?.stringValue
         buildNumber = fields["build_number"]?.stringValue
         osVersion = fields["os_version"]?.stringValue
+        fingerprint = fields["fingerprint"]?.stringValue
         date = fields["date"]?.dateValue
         startDate = fields["start_date"]?.dateValue
         endDate = fields["end_date"]?.dateValue
@@ -201,6 +205,8 @@ struct AddOSVersionField: AsyncMigration {
         while true {
             let query = RecordModel.query(on: database)
                 .filter(\.$recordType == "Session")
+                .field(\.$id)
+                .field(\.$payload)
                 .sort(\.$id)
                 .limit(500)
             if let last {
@@ -303,5 +309,44 @@ struct AddDeviceIndex: AsyncMigration {
 
     func revert(on database: any Database) async throws {
         try await database.sql().drop(index: Self.index).ifExists().run()
+    }
+}
+
+struct AddFingerprintField: AsyncMigration {
+    func prepare(on database: any Database) async throws {
+        try await database.schema(RecordModel.schema)
+            .field("fingerprint", .string)
+            .update()
+
+        var last: UUID?
+
+        while true {
+            let query = RecordModel.query(on: database)
+                .filter(\.$recordType ~~ IncidentService.recordTypes)
+                .field(\.$id)
+                .field(\.$payload)
+                .sort(\.$id)
+                .limit(500)
+            if let last {
+                query.filter(\.$id > last)
+            }
+
+            let page = try await query.all()
+            guard let tail = page.last else {
+                break
+            }
+
+            for model in page {
+                model.fingerprint = model.payload["fingerprint"]?.stringValue
+                try await model.save(on: database)
+            }
+            last = tail.id
+        }
+    }
+
+    func revert(on database: any Database) async throws {
+        try await database.schema(RecordModel.schema)
+            .deleteField("fingerprint")
+            .update()
     }
 }

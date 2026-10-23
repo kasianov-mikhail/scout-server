@@ -20,6 +20,7 @@ struct MetricsController: RouteCollection {
         metrics.get("series", use: series)
         metrics.get("devices", use: devices)
         metrics.get("device-counts", use: deviceCounts)
+        metrics.get("incidents", use: incidents)
     }
 
     func activeUsers(req: Request) async throws -> ActiveUsersResponse {
@@ -96,6 +97,17 @@ struct MetricsController: RouteCollection {
 
         let counts = try await DeviceService.counts(ranges: ranges, on: req.db)
         return DeviceCountsResponse(counts: counts)
+    }
+
+    func incidents(req: Request) async throws -> IncidentsResponse {
+        let type = req.query[String.self, at: "type"] ?? ""
+        guard IncidentService.recordTypes.contains(type) else {
+            throw Abort(.badRequest, reason: "Unknown type '\(type)'; expected \(IncidentService.recordTypes.joined(separator: " or "))")
+        }
+
+        let range = try Self.range(of: req)
+
+        return try await IncidentService.index(recordType: type, from: range.lowerBound, to: range.upperBound, on: req.db)
     }
 
     private static func range(pair: Substring) throws -> Range<Date> {

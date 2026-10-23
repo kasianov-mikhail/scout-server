@@ -348,3 +348,16 @@ func deviceCounts(_ ranges: [Range<Date>], on app: Application) async throws -> 
     )
     return response!.counts
 }
+
+func incidents(type: String, from: Date, to: Date, on app: Application) async throws -> IncidentsResponse {
+    var response: IncidentsResponse?
+    try await app.test(
+        .GET, "api/v1/metrics/incidents?type=\(type)&from=\(from.milliseconds)&to=\(to.milliseconds)",
+        headers: .authorized,
+        afterResponse: { res async throws in
+            XCTAssertEqual(res.status, .ok, res.body.string)
+            response = try res.content.decode(IncidentsResponse.self)
+        }
+    )
+    return response!
+}
