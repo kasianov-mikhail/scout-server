@@ -352,7 +352,6 @@ struct AddFingerprintField: AsyncMigration {
 }
 
 struct AddFingerprintIndex: AsyncMigration {
-    // Incident group screens fetch the crashes, hangs and resource exceptions of one fingerprint.
     static let index = "records_record_type_fingerprint_idx"
 
     func prepare(on database: any Database) async throws {
