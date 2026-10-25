@@ -60,6 +60,30 @@ final class RecordQueryTests: XCTestCase {
         }
     }
 
+    func testFiltersIncidentsByFingerprint() async throws {
+        try await withApp { app in
+            try await write(
+                [
+                    makeCrash(fingerprint: "f1", date: utcDate(2026, 6, 10, 9)),
+                    makeCrash(fingerprint: "f2", date: utcDate(2026, 6, 10, 10)),
+                    makeCrash(fingerprint: "f3", date: utcDate(2026, 6, 10, 11)),
+                ],
+                to: app
+            )
+
+            let response = try await query(
+                QueryRequest(
+                    recordType: "Crash",
+                    filters: [QueryFilter(field: "fingerprint", op: .in, value: .strings(["f1", "f2"]))],
+                    sort: [QuerySort(field: "date", ascending: true)]
+                ),
+                on: app
+            )
+
+            XCTAssertEqual(response.records.map { $0.fields["fingerprint"] }, [.string("f1"), .string("f2")])
+        }
+    }
+
     func testFiltersByPrefix() async throws {
         try await withApp { app in
             try await write(
@@ -304,4 +328,10 @@ final class RecordQueryTests: XCTestCase {
             XCTAssertEqual(response.records.map(\.recordType), ["Session"])
         }
     }
+}
+
+private func makeCrash(fingerprint: String, date: Date) -> Record {
+    var record = makeCrash(date: date)
+    record.fields["fingerprint"] = .string(fingerprint)
+    return record
 }
