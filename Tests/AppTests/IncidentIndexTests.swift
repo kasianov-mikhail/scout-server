@@ -92,6 +92,20 @@ final class IncidentIndexTests: XCTestCase {
             }
         }
     }
+
+    func testResourceExceptionsAreIndexed() async throws {
+        try await withApp { app in
+            try await write(
+                [makeIncident(type: "ResourceException", name: "CPU Exception", fingerprint: "r1", date: utcDate(2026, 6, 10, 9))],
+                to: app
+            )
+
+            let index = try await incidents(type: "ResourceException", from: utcDate(2026, 6, 1), to: utcDate(2026, 7, 1), on: app)
+
+            XCTAssertEqual(index.tallies.map(\.fingerprint), ["r1"])
+            XCTAssertNil(index.unkeyed)
+        }
+    }
 }
 
 private func makeIncident(type: String = "Crash", name: String = "SIGSEGV", fingerprint: String?, date: Date) -> Record {

@@ -10,7 +10,7 @@ import SQLKit
 import Vapor
 
 enum IncidentService {
-    static let recordTypes = ["Crash", "Hang"]
+    static let recordTypes = ["Crash", "Hang", "ResourceException"]
 
     static func index(recordType: String, from: Date, to: Date, on database: any Database) async throws -> IncidentsResponse {
         let sql = try database.sql()
